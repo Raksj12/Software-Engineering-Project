@@ -87,3 +87,7 @@ cd Software-Engineering-Project
 npm install
 npm start
 ```
+
+
+## use this for commit style
+   git commit -m "Short summary" -m "Longer explanation of what and why. Closes #N."
