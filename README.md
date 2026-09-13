@@ -8,8 +8,6 @@ A web-based online bookstore e-commerce platform that connects independent books
 - Jalil Jimenez
 - Everett Wappler
 
-**Instructor:** [Instructor Name]
-**Course:** [Course Number/Name]
 
 ## Project Overview
 BookHaven allows:
