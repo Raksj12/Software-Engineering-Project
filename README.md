@@ -2,7 +2,7 @@
 
 A web-based online bookstore e-commerce platform that connects independent booksellers with readers. Sellers list books for sale, an administrator reviews listings before they go live, and buyers search, browse, purchase, review, and manage a wishlist of books.
 
-## Team — Group [Your Group Number/Name]
+## Team — Group [2]
 - Cindy Cardona-Felix
 - Rakshit Jaiswal
 - Jalil Jimenez
