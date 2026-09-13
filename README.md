@@ -73,3 +73,17 @@ Out of scope for this phase:
 - Internal implementation of the payment gateway
 - Production hosting/deployment infrastructure
 - Native mobile applications
+
+## Team — Group [2]
+- Cindy Cardona-Felix
+- Rakshit Jaiswal
+- Jalil Jimenez
+- Everett Wappler
+
+## Getting Started (Local Development)
+```bash
+git clone https://github.com/Raksj12/Software-Engineering-Project.git
+cd Software-Engineering-Project
+npm install
+npm start
+```
