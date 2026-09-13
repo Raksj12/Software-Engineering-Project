@@ -1,6 +1,78 @@
 # BookHaven
 
-A web-based online bookstore e-commerce platform that connects independent booksellers with readers. Sellers list books for sale, an administrator reviews listings before they go live, and buyers search, browse, purchase, review, and manage a wishlist of books.
+BookHaven is a web-based e-commerce marketplace built to connect independent booksellers with readers. It gives small sellers a low-cost storefront while providing buyers with one place to search, compare, and purchase books from multiple sellers.
+
+## Purpose and objective
+
+Independent booksellers often lack resources to build custom e-commerce systems. BookHaven provides a shared platform where:
+- Sellers can list and manage inventory without technical overhead.
+- Buyers get a searchable catalog and a consistent checkout experience.
+- Admin moderation ensures listing quality and policy compliance before publication.
+
+## User roles
+
+### Buyers
+- Register and authenticate.
+- Search and browse catalog.
+- Purchase books.
+- Request returns/refunds within policy windows.
+
+### Sellers
+- Register and authenticate.
+- Create and manage listings with title, author, ISBN, genre, condition, description, cover image, price, and stock.
+
+### Administrators
+- Review submitted listings.
+- Check policy compliance, including invalid ISBNs and prohibited content.
+- Approve, reject, or request corrections before listings go live.
+
+## Core functionality
+
+1. **Account management**
+   - Registration, authentication, and role-based access control for buyers, sellers, and admins.
+2. **Listing creation and moderation**
+   - Seller listing submission with ISBN format/checksum validation and prohibited-content screening.
+   - Admin approval/rejection/change-request workflow.
+3. **Search and discovery**
+   - Search/filter by title, author, genre, and ISBN.
+4. **Cart and checkout**
+   - Add-to-cart, shipping details, payment method selection, and order placement through a third-party payment gateway.
+5. **Order lifecycle and notifications**
+   - Order confirmation and status notifications for buyers/sellers.
+   - Listing moderation notifications.
+6. **Returns and refunds**
+   - Buyer return request in eligibility window.
+   - Seller/admin review flow.
+   - Approved returns refunded to the original payment method.
+
+## Technical approach
+
+BookHaven follows a three-tier architecture:
+
+- **Front end**: Browser-based client for modern desktop/mobile browsers.
+- **Back end**: Business logic for permissions, listing validation, inventory consistency, and order processing.
+- **Database**: Relational storage for accounts, listings, orders, and returns.
+
+### External integrations
+- Third-party payment processor for transactions (BookHaven does not store raw payment card data, aligning with PCI-DSS practices).
+- Optional email/notification service for status alerts.
+
+## Concurrency and consistency
+
+The platform must support concurrent access safely, including preventing overselling when multiple buyers attempt to purchase the last in-stock copy simultaneously.
+
+## Current scope
+
+The initial release includes:
+- Account management
+- Listing creation/moderation
+- Search and checkout
+- Returns/refunds
+
+Out of scope for this phase:
+- Internal implementation of the payment gateway
+- Production hosting/deployment infrastructure
+- Native mobile applications
 
 ## Team — Group [2]
 - Cindy Cardona-Felix
@@ -8,50 +80,10 @@ A web-based online bookstore e-commerce platform that connects independent books
 - Jalil Jimenez
 - Everett Wappler
 
-
-## Project Overview
-BookHaven allows:
-- **Buyers** to register, log in, search/browse published book listings, add items to a cart, check out with payment processing, request returns/refunds, write reviews and ratings, and manage a wishlist.
-- **Sellers** to register, create and manage book listings (physical and digital), and fulfill orders (shipping/tracking or automatic digital delivery).
-- **Administrators** to review pending listings for policy compliance (prohibited content, valid ISBNs) and approve, reject, or request corrections before a listing is published.
-
-## Tech Stack
-- **Backend:** Node.js with the Express framework
-- **Database:** MySQL
-- **Frontend:** [fill in — e.g., React, plain HTML/CSS/JS]
-- **Payment Processing:** Third-party payment gateway (e.g., Stripe) — no raw card data stored on our servers
-- **Development Environment:** `localhost` during Sprint 1; production hosting environment to be determined in a later sprint
-
-## Documentation
-- **Software Requirements Specification (SRS):** [`docs/BookHaven_SRS.pdf`](docs/BookHaven_SRS.pdf)
-- **User Stories:** Included in Appendix A of the SRS (Section after Chapter 5)
-- **Meeting Minutes:** [`docs/MEETINGS.md`](docs/MEETINGS.md)
-
-## Team Meeting Schedule
-The team meets weekly on **Tuesdays and Thursdays at 12:00 PM**. Notes from each meeting are logged in [`docs/MEETINGS.md`](docs/MEETINGS.md).
-
-## Sprint 1 Deliverables
-- [x] Completed Software Requirements Specification (SRS)
-- [x] User stories with acceptance criteria (Appendix A of SRS)
-- [ ] GitHub Issues tracking Sprint 1 task assignments
-- [ ] Meeting minutes for all Sprint 1 team meetings
-
 ## Getting Started (Local Development)
 ```bash
 git clone https://github.com/Raksj12/Software-Engineering-Project.git
 cd Software-Engineering-Project
 npm install
 npm start
-```
-The application will run on `http://localhost:[PORT]`.
-
-## Repository Structure
-```
-Software-Engineering-Project/
-├── docs/
-│   ├── BookHaven_SRS.pdf
-│   ├── BookHaven_SRS.tex
-│   └── MEETINGS.md
-├── src/            # application source code (in progress)
-└── README.md
 ```
