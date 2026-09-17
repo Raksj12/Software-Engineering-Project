@@ -1,0 +1,78 @@
+/* ============================================================
+   LoanScope design tokens
+   Concept: a bank statement / paper ledger, not a SaaS dashboard.
+   Headline figures set in a serif (the "statement"); every input,
+   label, and tabular figure set in mono (the "ledger entries").
+   ============================================================ */
+
+:root {
+  /* color */
+  --ink: #17233a;          /* primary text, dark surfaces */
+  --ink-soft: #4a5568;     /* secondary text */
+  --paper: #e7ecef;        /* page background - cool steel-grey, not cream */
+  --surface: #fbfcfd;      /* card / panel surface */
+  --rule: #c7cdd4;         /* hairline dividers */
+  --rule-soft: #dde2e6;
+  --accent: #b9791f;       /* mustard/brass - sliders, active states, links */
+  --accent-soft: #f1e2c4;
+  --positive: #2f6f4f;     /* principal / paid-off / good news */
+  --positive-soft: #dfeee6;
+  --warn: #a8412f;         /* interest / rejected input / warnings */
+  --warn-soft: #f4dfda;
+
+  /* type */
+  --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
+  --font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+
+  --radius: 3px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-serif);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  margin: 0;
+}
+
+button {
+  font-family: var(--font-mono);
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

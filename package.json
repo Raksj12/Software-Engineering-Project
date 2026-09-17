@@ -1,0 +1,17 @@
+{
+  "name": "loanscope",
+  "private": true,
+  "version": "1.0.0",
+  "description": "LoanScope - interactive loan amortization visualizer",
+  "workspaces": [
+    "packages/calc-engine",
+    "packages/backend",
+    "packages/frontend"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace=packages/backend",
+    "dev:frontend": "npm run dev --workspace=packages/frontend",
+    "build:frontend": "npm run build --workspace=packages/frontend",
+    "test:engine": "npm test --workspace=packages/calc-engine"
+  }
+}

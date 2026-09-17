@@ -1,0 +1,10 @@
+{
+  "name": "@loanscope/calc-engine",
+  "version": "1.0.0",
+  "description": "Pure, framework-independent amortization calculation engine for LoanScope. Used identically by the frontend (for instant, real-time recalculation as the user drags sliders) and the backend (for server-side validation and CSV export), satisfying the SRS portability requirement of a single non-duplicated engine.",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test.js"
+  }
+}
