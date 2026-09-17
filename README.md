@@ -1,96 +1,72 @@
-# LoanScope
+# BookHaven
 
-LoanScope is a browser-based, single-page application that visualizes how a loan's payoff date, total interest, and remaining-balance curve change as you adjust the starting principal, annual interest rate, and monthly payment — in real time, with no page reload. Built to the CSE 4214 Software Requirements Specification, v1.0.
+BookHaven is a web-based online bookstore e-commerce platform that connects independent booksellers with readers. Sellers create accounts and list books for sale; buyers search, browse, and purchase those listings; and an administrator reviews and moderates every listing before it goes live. Built for CSE 4214 — Team BookHaven.
 
-**Tech stack:** React (Vite) frontend · Node.js + Express backend · a shared, framework-independent amortization engine used by both.
+**Team:** Cindy Cardona-Felix, Rakshit Jaiswal, Jalil Jimenez, Everett Wappler
 
-## Project structure
+**Full requirements:** see [`SRS_Latex__version_1__1_.pdf`](./SRS_Latex__version_1__1_.pdf) in this repo for the complete Software Requirements Specification (v1.0), including all 57 functional requirements, nonfunctional requirements, and the user stories in Appendix A that every requirement traces back to.
 
-This is an npm-workspaces monorepo with three packages:
+## What BookHaven does
+
+- **Buyers** register, log in, search and browse published book listings by title, author, genre, or ISBN, add books to a cart, check out with payment processing, request returns/refunds on eligible orders, leave star ratings and reviews on delivered books, and maintain a personal wishlist.
+- **Sellers** register, create and manage their own book listings (title, author, ISBN, genre, condition, description, cover image, price, stock), process and ship orders, and issue cancellations/refunds when needed.
+- **Administrators** review every new or materially-edited listing in a pending queue, screen for prohibited content and invalid ISBNs, and approve or reject listings before buyers ever see them.
+
+## Sprint 1 scope
+
+This sprint focuses on standing up the core account, listing, and moderation loop described in the SRS:
+
+- User Account Management (§3.1) — registration, login/logout, session handling, profile editing
+- Book Listing Management (§3.2) — sellers creating/editing/removing listings
+- Listing Review and Approval (§3.3) — the admin pending-review queue and approve/reject flow
+
+Search & Browse, Cart & Checkout, Returns/Refunds, Order Fulfillment, Reviews & Ratings, and Wishlist (§3.4–3.9) are specified in the SRS for the full v1.0 release and will be built out in later sprints.
+
+## Tech stack (Sprint 1 development environment)
+
+Per the SRS's Operating Environment (§2.4), Sprint 1 development and testing runs entirely on `localhost`:
+
+- **Backend:** Node.js + Express
+- **Database:** local MySQL instance
+- **Frontend:** web client accessed through a modern browser (Chrome, Firefox, Safari, or Edge), no client-side install beyond a browser with JavaScript enabled
+- **Payments:** a third-party payment gateway (selection TBD) — BookHaven never stores raw card data, per PCI-DSS considerations (§2.5, §4.3)
+
+A production deployment target (hosted Linux server or cloud platform) has not yet been selected and will be chosen in a later sprint.
+
+## Getting started
+
+> This section will be filled in with exact install/run commands once the Sprint 1 codebase is scaffolded (`npm install`, environment variables for the MySQL connection, `npm run dev`, etc.). For now:
+
+1. Install [Node.js](https://nodejs.org/) (LTS) and [MySQL](https://dev.mysql.com/downloads/mysql/) locally.
+2. Clone this repository.
+3. Create a local MySQL database for BookHaven and configure connection credentials (details to be added alongside the first backend commit).
+4. Install dependencies and start the Express server once the initial backend scaffold is committed.
+
+## Project structure (planned)
 
 ```
-loanscope/
-├── packages/
-│   ├── calc-engine/   # Pure amortization math (no DOM, no Express) — shared by frontend & backend
-│   ├── backend/       # Express REST/JSON API (stateless, no database)
-│   └── frontend/      # React + Vite single-page app (Recharts for the chart)
-└── package.json       # Workspace root
+bookhaven/
+├── SRS_Latex__version_1__1_.pdf   # Full Software Requirements Specification
+├── client/                        # Frontend web client
+├── server/                        # Node.js + Express backend
+│   ├── routes/                    # Account, listing, review-queue endpoints
+│   ├── models/                    # MySQL data models (users, listings, orders, ...)
+│   └── middleware/                # Auth, role-based access control
+└── README.md
 ```
 
-**Why the engine is imported directly by the frontend, not just called over the API:** the SRS requires the chart and summary to update within 200ms of an input change (REQ-14) and the full 1,200-month schedule to recompute within 100ms *in the browser* (Performance Requirements, §4.1). To hit that, the same pure `@loanscope/calc-engine` module is bundled straight into the frontend for instant local recalculation, and is separately `require`d by the Express backend so the documented client-server REST/JSON architecture (§2.1) and CSV export endpoint are still real and independently testable. This is exactly what the SRS's Portability requirement (§4.4) asks for: one calculation module, reused by both sides without duplication.
+## Requirements traceability
 
-## Requirements
+Every functional requirement in the SRS (REQ-1 through REQ-57) is derived from one of the 13 user stories in Appendix A, spanning Buyer, Seller, and Administrator roles. See the SRS document for the full requirement-to-user-story mapping.
 
-- Node.js **18+** (LTS) and npm **9+**
-- No database, no accounts, no external services — everything runs locally
+## Key nonfunctional commitments
 
-## Setup
+- Passwords are stored using a salted cryptographic hash, never in plain text (§4.3)
+- All client-server traffic, including login and payment-related data, is encrypted via HTTPS/TLS (§4.3)
+- Role-based access control keeps Buyers out of Seller tools, Sellers out of each other's listings, and the review queue restricted to Administrators (§4.3)
+- An order is only ever marked "Paid" after the payment gateway confirms a successful charge (§4.2)
+- Search/browse results return within 2 seconds and checkout completes within 5 seconds under normal load, excluding payment-gateway latency (§4.1)
 
-Clone the repo and install all workspace dependencies from the repo root (this installs the frontend, backend, and shared engine's dependencies in one step):
+## License / course notice
 
-```bash
-git clone <this-repo-url>
-cd loanscope
-npm install
-```
-
-## Running the project
-
-You need **two terminals** — one for the backend API, one for the frontend dev server.
-
-**Terminal 1 — backend** (starts on `http://localhost:4000`):
-
-```bash
-npm run dev:backend
-```
-
-**Terminal 2 — frontend** (starts on `http://localhost:5173`):
-
-```bash
-npm run dev:frontend
-```
-
-Then open **http://localhost:5173** in your browser. The frontend dev server proxies any `/api/*` request to the backend, so no CORS configuration is needed in development.
-
-> The SRS's security requirement to use HTTPS/TLS is explicitly waived for local grading/development ("For this assignment you will be localhosting, therefore you do not need to worry about setting up HTTPS" — §4.3), so both servers run over plain HTTP on localhost as written above.
-
-### Building for production
-
-```bash
-npm run build:frontend
-```
-
-This outputs a static, deployable bundle to `packages/frontend/dist/`. The backend is run the same way in production as in development: `npm run dev:backend` (or `node packages/backend/src/server.js`).
-
-### Running the engine's test suite
-
-```bash
-npm run test:engine
-```
-
-This exercises the core amortization math directly (30-year mortgage amortizing to $0, the non-amortizing-payment rejection, the 1,200-month horizon cap, integer-cents precision, and the 0% APR edge case).
-
-## Using the app
-
-1. Adjust **starting principal**, **annual interest rate**, and **monthly payment** with either the slider or the linked numeric field. Numeric field edits are debounced 300ms; slider drags recalculate immediately.
-2. The **payoff date, loan term, and total interest** update live above an interactive balance-over-time chart. Toggle "Overlay cumulative interest" to see both curves. Hover any point on the chart for exact figures at that month.
-3. Expand the **Amortization schedule** panel to see the full month-by-month breakdown, filter it to a single year, or **Export CSV**.
-4. Click **Share scenario** to copy a link that reproduces your exact inputs — anyone who opens it lands on the same scenario.
-5. If a monthly payment wouldn't even cover the interest accrued each month, the app rejects it with an explanation rather than silently accepting it (it would never pay off the loan).
-
-## Requirements coverage
-
-| SRS Section | Status |
-|---|---|
-| 3.1 Loan Parameter Input and Control (REQ-1–5) | Implemented — linked slider/numeric pairs, range validation, non-amortizing rejection, 300ms debounce |
-| 3.2 Real-Time Amortization Calculation Engine (REQ-6–10) | Implemented — pure module, integer-cents math, 1,200-month cap |
-| 3.3 Interactive Lifetime and Balance Visualization (REQ-11–14) | Implemented — Recharts line chart, interest overlay toggle, hover tooltips, headline stats |
-| 3.4 Amortization Schedule Table and Export (REQ-15–18) | Implemented — expandable table, year filter, pagination, CSV export |
-| 3.5 Sharing Scenarios (REQ-19–21) | Implemented — URL-param based scenario loading and sharing, with safe-default fallback for invalid params |
-| §4 Nonfunctional Requirements | Addressed — persistent disclaimer, no PII collection/storage, locale-aware currency/date formatting, keyboard-operable controls |
-
-## Notes / known limitations
-
-- Per the SRS (§2.5), automated frontend/backend integration tests are deferred to a later version; only the calculation engine has an automated test suite in v1.0.
-- WCAG 2.1 AA contrast/labeling and full keyboard operability were designed for throughout, but a formal accessibility audit has not been performed.
-- The exact disclaimer wording is marked **TBD-1** in the SRS pending legal review; the current wording is a placeholder.
+This project is developed for course evaluation purposes as part of CSE 4214. All design decisions in the linked SRS reflect the team's own work.
