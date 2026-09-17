@@ -4,8 +4,6 @@ BookHaven is a web-based online bookstore e-commerce platform that connects inde
 
 **Team:** Cindy Cardona-Felix, Rakshit Jaiswal, Jalil Jimenez, Everett Wappler
 
-**Full requirements:** see [`SRS_Latex__version_1__1_.pdf`](./SRS_Latex__version_1__1_.pdf) in this repo for the complete Software Requirements Specification (v1.0), including all 57 functional requirements, nonfunctional requirements, and the user stories in Appendix A that every requirement traces back to.
-
 ## What BookHaven does
 
 - **Buyers** register, log in, search and browse published book listings by title, author, genre, or ISBN, add books to a cart, check out with payment processing, request returns/refunds on eligible orders, leave star ratings and reviews on delivered books, and maintain a personal wishlist.
