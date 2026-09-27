@@ -1,0 +1,69 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="FJ4AUOaE-JUlEHojngv_">
+    <mxGraphModel grid="0" page="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="Rozb20swyM_iOBhQSiaO-1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="buyer" vertex="1">
+          <mxGeometry height="34" width="107" x="-61" y="-32" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-6" edge="1" parent="1" source="Rozb20swyM_iOBhQSiaO-2" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;fontSize=12;startSize=8;endSize=8;" target="Rozb20swyM_iOBhQSiaO-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="system( automation)" vertex="1">
+          <mxGeometry height="43" width="113" x="-58" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-10" edge="1" parent="1" source="Rozb20swyM_iOBhQSiaO-3" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0;exitDx=0;exitDy=0;fontSize=12;startSize=8;endSize=8;" target="Rozb20swyM_iOBhQSiaO-9">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-11" connectable="0" parent="Rozb20swyM_iOBhQSiaO-10" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="include" vertex="1">
+          <mxGeometry relative="1" x="0.0005" y="-1" as="geometry">
+            <mxPoint x="-5" y="-4" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-12" edge="1" parent="1" source="Rozb20swyM_iOBhQSiaO-3" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=12;startSize=8;endSize=8;" target="Rozb20swyM_iOBhQSiaO-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-13" connectable="0" parent="Rozb20swyM_iOBhQSiaO-12" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="include" vertex="1">
+          <mxGeometry relative="1" x="0.0068" y="6" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-14" edge="1" parent="1" source="Rozb20swyM_iOBhQSiaO-3" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=1;exitDx=0;exitDy=0;fontSize=12;startSize=8;endSize=8;" target="Rozb20swyM_iOBhQSiaO-7">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-15" connectable="0" parent="Rozb20swyM_iOBhQSiaO-14" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="incluide" vertex="1">
+          <mxGeometry relative="1" x="-0.0145" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-3" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;aspect=fixed;" value="auto fulfill digital order" vertex="1">
+          <mxGeometry height="99" width="99" x="201" y="-21" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-4" edge="1" parent="1" source="Rozb20swyM_iOBhQSiaO-1" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.051;entryY=0.357;entryDx=0;entryDy=0;entryPerimeter=0;fontSize=12;startSize=8;endSize=8;" target="Rozb20swyM_iOBhQSiaO-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-5" connectable="0" parent="Rozb20swyM_iOBhQSiaO-4" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=12;" value="triggers via purchase" vertex="1">
+          <mxGeometry relative="1" x="0.0782" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-17" edge="1" parent="1" source="Rozb20swyM_iOBhQSiaO-7" style="edgeStyle=none;curved=1;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;fontSize=12;startSize=8;endSize=8;" target="Rozb20swyM_iOBhQSiaO-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-7" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;aspect=fixed;" value="notify seller( record only)" vertex="1">
+          <mxGeometry height="96" width="96" x="423" y="118" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-8" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;aspect=fixed;" value="deliver file / link" vertex="1">
+          <mxGeometry height="99" width="99" x="417" y="-12" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-9" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;aspect=fixed;" value="generate access token / License" vertex="1">
+          <mxGeometry height="113" width="113" x="403" y="-141" as="geometry" />
+        </mxCell>
+        <mxCell id="Rozb20swyM_iOBhQSiaO-16" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="seller" vertex="1">
+          <mxGeometry height="25" width="103" x="607" y="151" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
