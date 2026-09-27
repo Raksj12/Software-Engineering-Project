@@ -32,4 +32,4 @@ This folder contains the UML diagrams for BookHaven. Diagrams cover User Stories
 | `Sequence_Diagram(User_Story_9).png` | Sequence Diagram | Shows the order of messages between the Seller, Admin, Client UI, App Server, and Database for creating a new listing |
 
 ### File Formats
-All files are exported `.png` files and be viewed directly on GitHub.
+All files are exported `.png` files and can be viewed directly on GitHub.
