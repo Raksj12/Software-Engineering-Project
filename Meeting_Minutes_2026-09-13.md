@@ -9,7 +9,7 @@ Group members were tasked with completing the rest of the user stories for Sprin
 | Jalil Jimenez | 5:00pm - 6:00pm | Complete 2 more user stories |
 | Everett Wappler | 5:00pm - 6:00pm | Complete 2 more user stories |
 
-### September 18, 2026 - Start Group Diagrams
+### September 17, 2026 - Start Group Diagrams
 Group members were tasked with reviewing Sprint 2 and start working on the group diagrams.
 | Name | Time | Work Assigned |
 |------|------|-------------|
