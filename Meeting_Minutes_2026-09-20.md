@@ -1,7 +1,7 @@
 # Week of September 20, 2026
 
 ### September 22, 2026 - Start Individual Diagrams
-Group members were tasked with choosing a user a story and creating 4 use-case, activity, and sequence diagrams
+Group members were tasked with choosing a user a story and creating 4 use case, activity, and sequence diagrams for each
 | Name | Time | Work Assigned |
 |------|------|-------------|
 | Cindy Cardona | 5:00pm - 6:00pm | Work on Diagrams for user stories 5, 6, 12, 13 |
