@@ -13,7 +13,7 @@ BookHaven lets sellers list books for sale, lets buyers search, browse, and purc
 - [Core Concept](#core-concept)
 - [User Roles](#user-roles)
 - [Full Feature Set (v1.0 Vision)](#full-feature-set-v10-vision)
-- [Sprint 1 Scope](#sprint-1-scope)
+- [Sprint Scope](#sprint-scope)
 - [Tech Stack](#tech-stack)
 - [System Architecture](#system-architecture)
 - [Getting Started](#getting-started)
@@ -64,7 +64,7 @@ This review gate is central to the product: nothing a seller submits is visible 
 |---|---|---|
 | **Buyer** | Register/login, search & browse, cart & checkout, request returns/refunds, write reviews, manage a wishlist | Account (self-registered) |
 | **Seller** | Register/login, create/edit/remove listings, fulfill & ship orders, cancel orders, issue refunds | Account (self-registered) |
-| **Administrator** | Review pending listings, approve/reject with a reason, maintain the prohibited-content word list | Account (created directly by the platform operator, not self-registered) |
+| **Administrator** | Review pending listings and accounts, approve/reject with a reason, moderate reviews, maintain the prohibited-content word list | Account (created directly by the platform operator, not self-registered) |
 
 ## Full Feature Set (v1.0 Vision)
 
@@ -80,25 +80,39 @@ The complete Software Requirements Specification defines nine system features, R
 8. **Reviews and Ratings** — a buyer can leave one star rating + written review per book, but only after their order for that book is marked "Delivered." Every review is screened against the prohibited-content list before publishing.
 9. **Wishlist** — buyers save books for later, get notified of duplicates instead of creating them, and see saved-but-now-unavailable books marked rather than silently removed.
 
-## Sprint 1 Scope
+## Sprint Scope
 
-Sprint 1 builds the **account → listing → moderation** core that everything else depends on:
+### Sprint 1 — Account → listing → moderation core
 
 - ✅ **User Account Management** (§3.1, REQ-1–7) — registration, login/logout, session handling, profile editing, role-based redirect
 - ✅ **Book Listing Management** (§3.2, REQ-8–14) — seller-side create/edit/remove, ISBN validation, out-of-stock handling
 - ✅ **Listing Review and Approval** (§3.3, REQ-15–20) — admin review queue, approve/reject with reason, prohibited-content flagging, ISBN re-validation
 
-**Deferred to later sprints:** Search & Browse, Shopping Cart & Checkout, Returns & Refunds, Order Fulfillment, Reviews & Ratings, and Wishlist (§3.4–3.9). These are fully specified in the SRS but depend on having accounts and published listings to work against first.
+### Sprint 3 — Full development through the purchase confirmation screen
+
+The goal of Sprint 3 is to get the web app all the way to the final confirmation button of a buyer's purchase. Deliverables:
+
+| Area | What's included |
+|---|---|
+| **Admin features** | Admin-only pages; approve/deny pending accounts and pending products; view all accounts and products; disable/re-enable them; review moderation and prohibited-word management |
+| **Buyer features** | Buyer-only pages; browse products; cart; checkout flow up to the final confirmation button; wishlist; write reviews |
+| **Seller features** | Seller-only pages; create, view, edit, and delete products bound to the logged-in seller's account |
+| **Authentication & authorization** | Login for all three roles; server-side role-based access control that denies pages a user isn't allowed to see; custom 404 page |
+| **Data population script** | Seed script that loads test users (all roles), products in each status, reviews, wishlist items, and prohibited words |
+| **Image/file storage** | Upload, store, and serve product cover images |
+
+**Deferred to later sprints:** payment gateway processing and order completion, Returns & Refunds, Order Fulfillment (§3.5 payment, §3.6, §3.7). These are fully specified in the SRS.
 
 ## Tech Stack
 
-Per the SRS's Operating Environment (§2.4), Sprint 1 runs entirely on `localhost` for development and testing:
+Per the SRS's Operating Environment (§2.4), development and testing run on `localhost`:
 
 | Layer | Technology |
 |---|---|
 | Frontend | Web client, modern browser (Chrome, Firefox, Safari, Edge — current + previous major version), JavaScript required |
 | Backend | Node.js + Express |
-| Database | MySQL (local instance for Sprint 1) |
+| Database | PostgreSQL (local instance for development) |
+| Image storage | Local file uploads served by the Express server (e.g., `multer`) |
 | Payments | Third-party payment gateway (provider TBD) — no raw card data ever touches BookHaven's own servers |
 | Notifications | Email / in-app notification service (provider TBD) |
 
@@ -118,21 +132,19 @@ A hosted production environment (cloud platform or Linux server) hasn't been sel
                     └─────────┬──────────┘
                  ┌────────────┼─────────────┐
                  ▼                          ▼
-         ┌───────────────┐        ┌──────────────────┐
-         │  MySQL Database │        │ Payment Gateway  │ (external)
-         └───────────────┘        └──────────────────┘
+      ┌─────────────────────┐      ┌──────────────────┐
+      │ PostgreSQL Database │      │ Payment Gateway  │ (external)
+      └─────────────────────┘      └──────────────────┘
 ```
 
 All three client roles (Buyer, Seller, Admin) talk to a single Express application server, which enforces role-based access control (a Buyer can never hit Seller listing-management routes; a Seller can never touch another Seller's listings; only Admins can reach the review queue) and is the only component that talks to the database and the external payment gateway.
 
 ## Getting Started
 
-> Sprint 1's codebase is being scaffolded now — this section will be updated with exact commands as soon as the initial backend/frontend skeleton is committed. The steps below reflect the intended setup.
-
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) (LTS release)
-- [MySQL](https://dev.mysql.com/downloads/mysql/) running locally
+- [PostgreSQL](https://www.postgresql.org/download/) running locally
 - npm (comes with Node.js)
 
 ### Setup
@@ -142,18 +154,33 @@ All three client roles (Buyer, Seller, Admin) talk to a single Express applicati
 git clone https://github.com/Raksj12/Software-Engineering-Project.git
 cd Software-Engineering-Project
 
-# 2. Install dependencies (once package.json exists)
+# 2. Install dependencies
 npm install
 
 # 3. Configure your local database connection
-#    Create a .env file with your MySQL credentials (see .env.example once added)
+#    Copy .env.example to .env and fill in your PostgreSQL credentials:
+#      DB_HOST=localhost
+#      DB_PORT=5432
+#      DB_NAME=bookhaven
+#      DB_USER=your_postgres_user
+#      DB_PASSWORD=your_postgres_password
+#      SESSION_SECRET=any_long_random_string
+cp .env.example .env
 
-# 4. Create the local BookHaven database and run migrations/schema setup
-#    (commands to be added alongside the first database migration commit)
+# 4. Create the local BookHaven database and apply the schema
+psql -U your_postgres_user -c "CREATE DATABASE bookhaven;"
+psql -U your_postgres_user -d bookhaven -f server/db/schema.sql
 
-# 5. Start the backend
+# 5. (Optional but recommended) Load test data
+npm run seed
+
+# 6. Start the backend
 npm run dev
 ```
+
+> Steps 4 and 5 use `server/db/schema.sql` and the `seed` npm script. If those files don't exist on your branch yet, pull the latest `main`.
+
+The seed script creates test accounts for each role so you can log in right away. Credentials are listed in the comments at the top of `server/db/seed.js`. **For development only.**
 
 The frontend and backend will run on separate local ports during development (exact ports to be documented once the servers are scaffolded).
 
@@ -168,10 +195,14 @@ Software-Engineering-Project/
 │   ├── src/
 │   └── ...
 ├── server/                        # Node.js + Express backend
-│   ├── routes/                    # account, listings, review-queue endpoints
-│   ├── models/                    # MySQL data models (users, listings, orders, reviews...)
+│   ├── routes/                    # auth, listings, review queue, cart/checkout, wishlist, reviews, admin
+│   ├── models/                    # PostgreSQL data access (users, listings, orders, reviews, wishlists, prohibited words...)
 │   ├── middleware/                # authentication, role-based access control
-│   └── config/                    # database connection, environment config
+│   ├── config/                    # database connection, environment config
+│   ├── db/
+│   │   ├── schema.sql             # table definitions
+│   │   └── seed.js                # data population script
+│   └── uploads/                   # uploaded product images (git-ignored)
 ├── .env.example                   # template for local environment variables
 ├── .gitignore
 └── README.md
@@ -212,9 +243,9 @@ Every functional requirement in the SRS (REQ-1 through REQ-57) traces back to at
 ## Roadmap
 
 - [x] Sprint 1: Account management, listing management, review/approval workflow
-- [ ] Sprint 2: Search & browse, shopping cart & checkout
-- [ ] Sprint 3: Order fulfillment, returns & refunds
-- [ ] Sprint 4: Reviews & ratings, wishlist
+- [ ] Sprint 2: Search & browse, shopping cart & checkout flow
+- [ ] Sprint 3: Full development through the purchase confirmation screen — admin, buyer, and seller features; authentication and authorization with 404 page; data population script; product image storage; wishlist and reviews
+- [ ] Sprint 4: Payment gateway integration, order fulfillment, returns & refunds
 - [ ] Production deployment environment selection
 
 ## Documentation
