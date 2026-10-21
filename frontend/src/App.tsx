@@ -1,9 +1,7 @@
-
+import ManageWishlist from "./Pages/ManageWishlist";
 
 function App() {
-
-  return null; 
-    
+   return <ManageWishlist />;
 }
 
 export default App
