@@ -154,8 +154,12 @@ All three client roles (Buyer, Seller, Admin) talk to a single Express applicati
 git clone https://github.com/Raksj12/Software-Engineering-Project.git
 cd Software-Engineering-Project
 
-# 2. Install dependencies
+# 2. Install backend and frontend dependencies
+cd backend
 npm install
+cd ..\frontend
+npm install
+cd ..\backend
 
 # 3. Configure your local database connection
 #    Copy .env.example to .env and fill in your PostgreSQL credentials:
@@ -164,25 +168,44 @@ npm install
 #      DB_NAME=bookhaven
 #      DB_USER=your_postgres_user
 #      DB_PASSWORD=your_postgres_password
-#      SESSION_SECRET=any_long_random_string
-cp .env.example .env
+#      AUTH_SECRET=any_long_random_string
+copy .env.example .env
 
 # 4. Create the local BookHaven database and apply the schema
 psql -U your_postgres_user -c "CREATE DATABASE bookhaven;"
-psql -U your_postgres_user -d bookhaven -f server/db/schema.sql
+psql -U your_postgres_user -d bookhaven -f sql/schema.sql
 
 # 5. (Optional but recommended) Load test data
-npm run seed
+npm run db:seed
 
 # 6. Start the backend
 npm run dev
 ```
 
-> Steps 4 and 5 use `server/db/schema.sql` and the `seed` npm script. If those files don't exist on your branch yet, pull the latest `main`.
+> Steps 4 and 5 use `backend/sql/schema.sql` and the `backend` `db:seed` npm script.
 
-The seed script creates test accounts for each role so you can log in right away. Credentials are listed in the comments at the top of `server/db/seed.js`. **For development only.**
+The seed script creates test accounts for each role so you can log in right away. The development credentials are listed below. **For development only.**
 
-The frontend and backend will run on separate local ports during development (exact ports to be documented once the servers are scaffolded).
+The backend runs on `http://localhost:3000` and the Vite frontend runs on `http://localhost:5173`.
+
+### Seeded development accounts
+
+| Role | Email | Password |
+|---|---|---|
+| Admin | `admin@bookhaven.test` | `admin123` |
+| Buyer | `buyer@bookhaven.test` | `buyer123` |
+| Seller | `seller@bookhaven.test` | `seller123` |
+
+### Authentication API
+
+- `POST /api/auth/register` registers a buyer or seller as `pending`.
+- `POST /api/auth/login` returns an eight-hour signed Bearer token for approved accounts.
+- `POST /api/auth/logout` is the authenticated logout boundary; clients discard the token.
+- `GET /api/auth/me` returns the authenticated user.
+- `/api/buyer/account`, `/api/seller/account`, and `/api/admin/account` demonstrate server-side role guards.
+- Unknown routes return a JSON 404 response.
+
+Send the login token on protected requests as `Authorization: Bearer <token>`.
 
 ## Project Structure
 
@@ -191,19 +214,12 @@ Planned layout as the codebase is built out:
 ```
 Software-Engineering-Project/
 ├── SRS_Latex__version_1__1_.pdf   # Full Software Requirements Specification (v1.0)
-├── client/                        # Frontend web client
-│   ├── src/
-│   └── ...
-├── server/                        # Node.js + Express backend
-│   ├── routes/                    # auth, listings, review queue, cart/checkout, wishlist, reviews, admin
-│   ├── models/                    # PostgreSQL data access (users, listings, orders, reviews, wishlists, prohibited words...)
-│   ├── middleware/                # authentication, role-based access control
-│   ├── config/                    # database connection, environment config
-│   ├── db/
-│   │   ├── schema.sql             # table definitions
-│   │   └── seed.js                # data population script
-│   └── uploads/                   # uploaded product images (git-ignored)
-├── .env.example                   # template for local environment variables
+├── frontend/                     # React + Vite web client
+│   └── src/
+├── backend/                      # Node.js + Express backend
+│   ├── src/                      # API, authentication, database, and seed code
+│   └── sql/schema.sql            # PostgreSQL table definitions
+├── backend/.env.example           # template for local environment variables
 ├── .gitignore
 └── README.md
 ```
@@ -244,7 +260,7 @@ Every functional requirement in the SRS (REQ-1 through REQ-57) traces back to at
 
 - [x] Sprint 1: Account management, listing management, review/approval workflow
 - [ ] Sprint 2: Search & browse, shopping cart & checkout flow
-- [ ] Sprint 3: Full development through the purchase confirmation screen — admin, buyer, and seller features; authentication and authorization with 404 page; data population script; product image storage; wishlist and reviews
+- [x] Sprint 3 foundation: PostgreSQL schema, authentication/authorization, 404 page, and data population script
 - [ ] Sprint 4: Payment gateway integration, order fulfillment, returns & refunds
 - [ ] Production deployment environment selection
 
