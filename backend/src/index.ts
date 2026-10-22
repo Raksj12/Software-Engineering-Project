@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { pool } from "./db.js";
 import { createToken, hashPassword, parseToken, type AuthUser, type Role, verifyPassword } from "./auth.js";
+import wishlistRoutes from "./wishlist.js"; // ANOTHERRRRRRRRRRRRRRR
 
 dotenv.config();
 
@@ -122,6 +123,9 @@ app.get("/api/seller/account", authRequired, requireRoles("seller"), (req, res) 
 app.get("/api/admin/account", authRequired, requireRoles("admin"), (req, res) => {
   res.json({ user: req.user });
 });
+
+// ANOTHERRRRRRRRRRRRRRRRRRRRRRRRR
+app.use("/api/wishlist", wishlistRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Page not found." });
