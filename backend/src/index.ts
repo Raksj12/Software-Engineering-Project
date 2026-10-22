@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import { pool } from "./db.js";
 import { createToken, hashPassword, parseToken, type AuthUser, type Role, verifyPassword } from "./auth.js";
-import wishlistRoutes from "./wishlist.js"; // ANOTHERRRRRRRRRRRRRRR
+import wishlistRoutes from "./wishlist.js"; 
 
 dotenv.config();
 
@@ -108,8 +108,90 @@ app.post("/api/auth/logout", authRequired, (_req, res) => {
   res.status(204).send();
 });
 
-app.get("/api/auth/me", authRequired, (req, res) => {
-  res.json({ user: req.user });
+
+app.get("/api/auth/me", authRequired, async (req, res, next) => {
+  try {
+    // Get the user's latest information from the database
+    const result = await pool.query(
+      `SELECT id, email, full_name AS "fullName", role, status
+       FROM users
+       WHERE id = $1`,
+      [req.user!.id]
+    );
+
+    // Check if the user still exists
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    // Return the updated profile information
+    res.set("Cache-Control", "no-store");
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
+});
+
+
+app.patch("/api/auth/me", authRequired, async (req, res, next) => {
+  try {
+    // Get the updated name and email
+    const { fullName, email } = req.body as {
+      fullName?: string;
+      email?: string;
+    };
+
+    // Clean up the user's input
+    const name = fullName?.trim();
+    const newEmail = email?.trim().toLowerCase();
+
+    // Make sure both fields are filled out
+    if (!name || !newEmail) {
+      res.status(400).json({
+        error: "Full name and email are required.",
+      });
+      return;
+    }
+
+    // Update the user's information in the database
+    const result = await pool.query(
+      `UPDATE users
+       SET full_name = $1,
+           email = $2,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING id, email, full_name AS "fullName", role, status`,
+      [name, newEmail, req.user!.id]
+    );
+
+    // Check if the user exists
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: "User not found." });
+      return;
+    }
+
+    // Send back the updated profile
+    res.json({
+      message: "Profile updated successfully.",
+      user: result.rows[0],
+    });
+  } catch (error: unknown) {
+    // Check if the email is already being used
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "23505"
+    ) {
+      res.status(409).json({
+        error: "An account with that email already exists.",
+      });
+      return;
+    }
+
+    next(error);
+  }
 });
 
 app.get("/api/buyer/account", authRequired, requireRoles("buyer"), (req, res) => {
@@ -124,7 +206,6 @@ app.get("/api/admin/account", authRequired, requireRoles("admin"), (req, res) =>
   res.json({ user: req.user });
 });
 
-// ANOTHERRRRRRRRRRRRRRRRRRRRRRRRR
 app.use("/api/wishlist", wishlistRoutes);
 
 app.use((_req, res) => {
