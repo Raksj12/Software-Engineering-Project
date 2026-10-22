@@ -13,6 +13,7 @@ function Profile() {
       const token = sessionStorage.getItem("authToken");
 
       if (!token) {
+        setIsLoggedIn(false);
         setMessage("Please log in first.");
         setLoading(false);
         return;
@@ -28,11 +29,12 @@ function Profile() {
 
         const data = await response.json();
 
-        if (!response.ok) {
-          setMessage(data.error || "Could not load profile.");
-          sessionStorage.removeItem("authToken");
-          return;
-        }
+       if (!response.ok) {
+        sessionStorage.removeItem("authToken");
+        setIsLoggedIn(false);
+        setMessage("Your session has expired. Please log in again.");
+        return;
+       }
 
         setFullName(data.user.fullName);
         setEmail(data.user.email);
@@ -45,7 +47,12 @@ function Profile() {
     }
 
     loadProfile();
-  }, []);
+    // Check the login session every minute
+    const interval = setInterval(loadProfile, 60 * 1000);
+
+    // Stop checking when leaving Profile
+    return () => clearInterval(interval);
+    }, []);
 
   // Save changes to the user's profile
   async function handleUpdate(event: React.FormEvent<HTMLFormElement>) {
