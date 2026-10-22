@@ -4,6 +4,11 @@ import dotenv from "dotenv";
 import { pool } from "./db.js";
 import { createToken, hashPassword, parseToken, type AuthUser, type Role, verifyPassword } from "./auth.js";
 
+import { searchRouter } from "./searchRoutes.js";
+import { fulfillmentRouter } from "./fulfillmentRoutes.js";
+import { adminRouter } from "./adminRoutes.js";
+import { notificationsRouter } from "./notifications.js";
+
 dotenv.config();
 
 declare global {
@@ -122,6 +127,11 @@ app.get("/api/seller/account", authRequired, requireRoles("seller"), (req, res) 
 app.get("/api/admin/account", authRequired, requireRoles("admin"), (req, res) => {
   res.json({ user: req.user });
 });
+
+app.use("/api/admin", authRequired, requireRoles("admin"), adminRouter);
+app.use("/api/notifications", authRequired, notificationsRouter);
+app.use("/api/listings", searchRouter);
+app.use("/api/seller/orders", authRequired, requireRoles("seller"), fulfillmentRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Page not found." });

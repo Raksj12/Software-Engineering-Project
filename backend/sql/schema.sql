@@ -87,3 +87,31 @@ CREATE TABLE IF NOT EXISTS order_items (
 CREATE INDEX IF NOT EXISTS products_status_idx ON products(status);
 CREATE INDEX IF NOT EXISTS products_seller_idx ON products(seller_id);
 CREATE INDEX IF NOT EXISTS reviews_product_idx ON reviews(product_id);
+
+ALTER TABLE products ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  message TEXT NOT NULL,
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS admin_actions (
+  id BIGSERIAL PRIMARY KEY,
+  admin_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  target_type TEXT NOT NULL,
+  target_id BIGINT NOT NULL,
+  details TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS fulfillment_status TEXT NOT NULL DEFAULT 'pending'
+  CHECK (fulfillment_status IN ('pending', 'processing', 'shipped', 'cancelled'));
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS carrier TEXT;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS tracking_number TEXT;
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id);
