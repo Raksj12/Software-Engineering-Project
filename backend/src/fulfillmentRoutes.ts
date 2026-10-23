@@ -83,7 +83,7 @@ fulfillmentRouter.post("/:orderId/items/:productId/cancel", async (req, res) => 
     res.status(400).json({ error: "A cancellation reason is required." });
     return;
   }
-  // TODO: issue the refund through Rakshit's payment abstraction and restore stock.
+ 
   await moveItem(req, res, ["pending", "processing"], "cancelled", { reason },
     (t) => `Your order for "${t}" was cancelled: ${reason}`);
 });
