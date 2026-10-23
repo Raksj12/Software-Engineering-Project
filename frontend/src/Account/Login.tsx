@@ -15,6 +15,7 @@ function Login() {
     event.preventDefault();
     setMessage("");
 
+    // Send the login information to the backend
     try {
       const response = await fetch("http://localhost:3000/api/auth/login", {
         method: "POST",

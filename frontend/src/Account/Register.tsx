@@ -11,6 +11,7 @@ function Register() {
     event.preventDefault();
     setMessage("");
 
+    // Send registration information to the backend
     try {
       const response = await fetch("http://localhost:3000/api/auth/register", {
         method: "POST",
@@ -37,6 +38,7 @@ function Register() {
     }
   }
 
+  // Display the registration form
   return (
     <div>
       <h2>Create Account</h2>

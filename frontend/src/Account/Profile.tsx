@@ -67,6 +67,7 @@ function Profile() {
       return;
     }
 
+    // Update the user's profile in the database 
     try {
       const response = await fetch("http://localhost:3000/api/auth/me", {
         method: "PATCH",

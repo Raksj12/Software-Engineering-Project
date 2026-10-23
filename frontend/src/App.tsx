@@ -4,6 +4,8 @@ import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 import Login from "./Account/Login";
 import Register from "./Account/Register";
 import Profile from "./Account/Profile";
+import WriteReview from "./Reviews/WriteReview";
+import ManageWishlist from "./Wishlist/ManageWishlist";
 
 function ProtectedPage({ role }: { role: "buyer" | "seller" | "admin" }) {
   const [user, setUser] = useState<{ role: string } | null>(null);
@@ -73,13 +75,26 @@ function ProtectedPage({ role }: { role: "buyer" | "seller" | "admin" }) {
   );
 }
 
+// Display a 404 page for invalid URLs
+function NotFound() {
+  return (
+    <div>
+      <h1>404 - Page Not Found</h1>
+      <p>Sorry, the page you are looking for does not exist.</p>
+      <Link to="/login">Back to Login</Link>
+    </div>
+  );
+}
+
 function App() {
   return (
     <BrowserRouter>
       <nav>
         <Link to="/login">Login</Link>{" | "}
         <Link to="/register">Register</Link>{" | "}
-        <Link to="/profile">Profile</Link>
+        <Link to="/profile">Profile</Link>{" | "}
+        <Link to="/reviews/write">Write Review</Link>{" | "}
+        <Link to="/wishlist">Wishlist</Link>
       </nav>
 
       <Routes>
@@ -87,10 +102,13 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/reviews/write" element={<WriteReview />} />
+        <Route path="/wishlist" element={<ManageWishlist />} />
 
         <Route path="/buyer" element={<ProtectedPage role="buyer" />} />
         <Route path="/seller" element={<ProtectedPage role="seller" />} />
         <Route path="/admin" element={<ProtectedPage role="admin" />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   );

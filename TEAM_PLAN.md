@@ -3,9 +3,9 @@
 ## Cindy Cardona-Felix
 - [x] Implement user account registration/login/logout/profile editing
 - [x] Add role-based redirects and session timeout behavior
-- [ ] Implement reviews/ratings submission and validation rules
-- [ ] Implement wishlist add/view/remove and unavailable-item behavior
-- [ ] Add tests for buyer account and buyer engagement features
+- [x] Implement reviews/ratings submission and validation rules
+- [x] Implement wishlist add/view/remove and unavailable-item behavior
+- [x] Add tests for buyer account and buyer engagement features
 
 ## Rakshit Jaiswal
 - [x] Bootstrap Node.js/Express baseline project structure
