@@ -4,6 +4,7 @@ import dotenv from "dotenv";
 import { pool } from "./db.js";
 import { createToken, hashPassword, parseToken, type AuthUser, type Role, verifyPassword } from "./auth.js";
 import wishlistRoutes from "./wishlist.js"; 
+import reviewsRoutes from "./reviews.js";
 
 dotenv.config();
 
@@ -206,7 +207,25 @@ app.get("/api/admin/account", authRequired, requireRoles("admin"), (req, res) =>
   res.json({ user: req.user });
 });
 
+// Get books for the wishlist page
+app.get("/api/products", async (_req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, title, author, status, stock
+       FROM products
+       ORDER BY id`
+    );
+
+    res.json(result.rows);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use("/api/wishlist", wishlistRoutes);
+
+// Only logged in buyers can access review submission
+app.use("/api/reviews", authRequired, requireRoles("buyer"), reviewsRoutes);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Page not found." });
