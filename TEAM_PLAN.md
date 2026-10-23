@@ -26,8 +26,8 @@
 - [ ] Add persistence models/migrations for listings and returns
 
 ## Everett Wappler
-- [ ] Implement admin listing moderation queue and actions
-- [ ] Implement prohibited words/phrases list management
+- [x] Implement admin listing moderation queue and actions
+- [x] Implement prohibited words/phrases list management
 - [ ] Implement search/browse by title/author/genre/ISBN
-- [ ] Implement order fulfillment (processing, shipping, tracking, cancel)
-- [ ] Add notifications for moderation and fulfillment updates
+- [x] Implement order fulfillment (processing, shipping, tracking, cancel)
+- [x] Add notifications for moderation and fulfillment updates
