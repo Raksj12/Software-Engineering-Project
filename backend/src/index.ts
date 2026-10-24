@@ -10,6 +10,9 @@ import { searchRouter } from "./searchRoutes.js";
 import { fulfillmentRouter } from "./fulfillmentRoutes.js";
 import { adminRouter } from "./adminRoutes.js";
 import { notificationsRouter } from "./notifications.js";
+import { sellerListingsRouter } from "./sellerListings.js";
+import { ordersRouter } from "./orders.js";
+import { imagesRouter } from "./images.js";
 
 dotenv.config();
 
@@ -212,12 +215,13 @@ app.get("/api/admin/account", authRequired, requireRoles("admin"), (req, res) =>
   res.json({ user: req.user });
 });
 
-// Get books for the wishlist page
+// Get books for the wishlist page. Only published books, so pending and rejected listings stay hidden.
 app.get("/api/products", async (_req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT id, title, author, status, stock
        FROM products
+       WHERE status = 'approved'
        ORDER BY id`
     );
 
@@ -236,6 +240,9 @@ app.use("/api/admin", authRequired, requireRoles("admin"), adminRouter);
 app.use("/api/notifications", authRequired, notificationsRouter);
 app.use("/api/listings", searchRouter);
 app.use("/api/seller/orders", authRequired, requireRoles("seller"), fulfillmentRouter);
+app.use("/api/seller/listings", authRequired, requireRoles("seller"), sellerListingsRouter);
+app.use("/api/orders", authRequired, requireRoles("buyer"), ordersRouter);
+app.use("/api/images", imagesRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Page not found." });

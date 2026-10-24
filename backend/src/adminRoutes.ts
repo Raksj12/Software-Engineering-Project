@@ -1,23 +1,9 @@
 import { Router, type Request, type Response } from "express";
 import { pool } from "./db.js";
 import { createNotification } from "./notifications.js";
+import { isValidIsbn } from "./isbn.js";
 
 export const adminRouter = Router();
-
-// Placeholder until ISBN validator is merged.
-function isValidIsbn(raw: string | null): boolean {
-  if (!raw) return false;
-  const s = raw.replace(/[-\s]/g, "");
-  if (/^\d{9}[\dXx]$/.test(s)) {
-    const sum = [...s].reduce((t, c, i) => t + (10 - i) * (c.toUpperCase() === "X" ? 10 : Number(c)), 0);
-    return sum % 11 === 0;
-  }
-  if (/^\d{13}$/.test(s)) {
-    const sum = [...s].reduce((t, c, i) => t + Number(c) * (i % 2 === 0 ? 1 : 3), 0);
-    return sum % 10 === 0;
-  }
-  return false;
-}
 
 async function logAction(adminId: number, action: string, targetType: string, targetId: number, details?: string) {
   await pool.query(

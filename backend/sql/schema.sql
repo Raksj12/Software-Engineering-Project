@@ -115,3 +115,12 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS tracking_number TEXT;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
 
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id);
+
+-- Uploaded cover images, stored in the database. products.image_path holds /api/images/<id>.
+CREATE TABLE IF NOT EXISTS images (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  mime_type TEXT NOT NULL CHECK (mime_type IN ('image/jpeg', 'image/png', 'image/webp')),
+  data BYTEA NOT NULL,
+  uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);

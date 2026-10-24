@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { BrowserRouter, Routes, Route, Link, Navigate } from "react-router-dom";
 
 import Login from "./Account/Login";
@@ -6,8 +6,16 @@ import Register from "./Account/Register";
 import Profile from "./Account/Profile";
 import WriteReview from "./Reviews/WriteReview";
 import ManageWishlist from "./Wishlist/ManageWishlist";
+import BuyerHome from "./Buyer/BuyerHome";
+import BookDetails from "./Buyer/BookDetails";
+import BuyBook from "./Buyer/BuyBook";
+import SellerHome from "./Seller/SellerHome";
+import AdminHome from "./Admin/AdminHome";
 
-function ProtectedPage({ role }: { role: "buyer" | "seller" | "admin" }) {
+type Role = "buyer" | "seller" | "admin";
+
+// Only shows the page to logged-in users whose role is in the allowed list
+function ProtectedPage({ roles, children }: { roles: Role[]; children: ReactNode }) {
   const [user, setUser] = useState<{ role: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -63,16 +71,11 @@ function ProtectedPage({ role }: { role: "buyer" | "seller" | "admin" }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (user.role !== role) {
+  if (!roles.includes(user.role as Role)) {
     return <p>Access denied. You do not have permission to view this page.</p>;
   }
 
-  return (
-    <div>
-      <h2>{role.charAt(0).toUpperCase() + role.slice(1)} Page</h2>
-      <p>You are logged in as a {role}.</p>
-    </div>
-  );
+  return <>{children}</>;
 }
 
 // Display a 404 page for invalid URLs
@@ -101,13 +104,15 @@ function App() {
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/reviews/write" element={<WriteReview />} />
-        <Route path="/wishlist" element={<ManageWishlist />} />
+        <Route path="/profile" element={<ProtectedPage roles={["buyer", "seller", "admin"]}><Profile /></ProtectedPage>} />
+        <Route path="/reviews/write" element={<ProtectedPage roles={["buyer"]}><WriteReview /></ProtectedPage>} />
+        <Route path="/wishlist" element={<ProtectedPage roles={["buyer"]}><ManageWishlist /></ProtectedPage>} />
 
-        <Route path="/buyer" element={<ProtectedPage role="buyer" />} />
-        <Route path="/seller" element={<ProtectedPage role="seller" />} />
-        <Route path="/admin" element={<ProtectedPage role="admin" />} />
+        <Route path="/buyer" element={<ProtectedPage roles={["buyer"]}><BuyerHome /></ProtectedPage>} />
+        <Route path="/buyer/books/:id" element={<ProtectedPage roles={["buyer"]}><BookDetails /></ProtectedPage>} />
+        <Route path="/buyer/books/:id/buy" element={<ProtectedPage roles={["buyer"]}><BuyBook /></ProtectedPage>} />
+        <Route path="/seller" element={<ProtectedPage roles={["seller"]}><SellerHome /></ProtectedPage>} />
+        <Route path="/admin" element={<ProtectedPage roles={["admin"]}><AdminHome /></ProtectedPage>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
