@@ -20,3 +20,13 @@ Actual results below reflect the validation performed during Sprint 4 implementa
 | TC-014 | REQ-053, REQ-054, REQ-055, REQ-056, REQ-057 | Wishlist lifecycle | Integration | Buyer token | Add duplicate, view, remove unavailable item | Product 1 | Duplicate is rejected; unavailable item remains visible | Existing wishlist tests passed | Pass |
 | TC-015 | REQ-006, REQ-007 | Profile and inactivity | Manual | Authenticated account | Edit profile and wait for timeout | Name/email | Permitted profile changes persist; inactivity reset is deferred | Profile update is available; inactivity-reset semantics are deferred from MVP | Not Run |
 | TC-016 | REQ-045, REQ-046 | Digital fulfillment | Manual | Digital product fixture | Complete digital order | Digital listing | Access token delivered and seller notified | Complete digital delivery is deferred from MVP | Not Run |
+
+<!-- Test cases TC-017 through TC-023 by Cindy Cardona -->
+
+| TC-017 | Sprint 4 SRS: Buyer Order History | Order history requires login | Integration | API available | Request order history without a token | No token | 401 Unauthorized | Returned 401 | Pass |
+| TC-018 | Sprint 4 SRS: Buyer Order History | Buyer can view order history | Integration | Buyer logged in | Request buyer order history | Buyer token | 200 and orders array | Returned 200 with orders array | Pass |
+| TC-019 | Sprint 4 SRS: Buyer Order History | Buyer with no orders sees empty history | Integration | Another buyer (ID 999999) has no orders | Request order history using another buyer's token | Another buyer token (ID 999999) | 200 and an empty orders array | Returned 200 with an empty orders array | Pass |
+| TC-020 | Sprint 4 SRS: Buyer Refund Requests | Refund requires login | Integration | API available | Request refund without a token | Order ID 1 | 401 Unauthorized | Returned 401 | Pass |
+| TC-021 | REQ-036 | Refund requires reason | Integration | Buyer logged in | Submit an empty refund reason | Empty reason | 400 Bad Request | Returned 400 | Pass |
+| TC-022 | Sprint 4 SRS: Buyer Refund Requests | Invalid refund order ID | Integration | Buyer logged in | Submit refund with a negative order ID | Order ID -1 | 400 Bad Request | Returned 400 | Pass |
+| TC-023 | REQ-034 | Missing refund order | Integration | Buyer logged in | Request refund for a nonexistent order | Order ID 999999 | 404 Not Found | Returned 500 due to SQL parameter type error | Fail |

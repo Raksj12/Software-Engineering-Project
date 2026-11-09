@@ -100,3 +100,26 @@ Use a local PostgreSQL database named `bookhaven_test` where possible. Configure
 - RTM: Requirements Traceability Matrix
 - SRS: Software Requirements Specification
 - UI: User Interface
+
+## 6 Buyer Order and Refund Testing
+
+### 6.1 Testing Completed
+
+Cindy Cardona created seven integration tests in `backend/tests/orders.test.ts` to test buyer order history and refund requests.
+
+The tests check:
+- Login requirements for order history and refunds.
+- Buyer order history responses.
+- Empty order history for another buyer.
+- Refund requests without a reason.
+- Invalid and nonexistent order IDs.
+
+### 6.2 Test Results
+
+- Total tests: 7
+- Passed: 6
+- Failed: 1
+
+TC-023 failed because the refund endpoint returned HTTP 500 instead of the expected HTTP 404 for a nonexistent order. The error was caused by an SQL parameter type issue in `backend/src/orders.ts`.
+
+The issue still needs to be fixed and the test rerun.
