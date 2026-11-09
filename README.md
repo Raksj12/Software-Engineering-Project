@@ -153,11 +153,15 @@ All three client roles (Buyer, Seller, Admin) talk to a single Express applicati
 - [PostgreSQL](https://www.postgresql.org/download/) running locally
 - npm (comes with Node.js)
 
-### Setup
+### Setup from a clean clone
+
+The commands below are for Windows PowerShell. If PostgreSQL was installed
+with the default Windows installer, use the full `psql.exe` path because
+`psql` may not be added to PATH automatically.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Raksj12/Software-Engineering-Project.git
+git clone --branch buildup-general https://github.com/Raksj12/Software-Engineering-Project.git
 cd Software-Engineering-Project
 
 # 2. Install backend and frontend dependencies
@@ -178,8 +182,8 @@ cd ..\backend
 copy .env.example .env
 
 # 4. Create the local BookHaven database and apply the schema
-psql -U your_postgres_user -c "CREATE DATABASE bookhaven;"
-psql -U your_postgres_user -d bookhaven -f sql/schema.sql
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -c "CREATE DATABASE bookhaven;"
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d bookhaven -f ".\sql\schema.sql"
 
 # 5. (Optional but recommended) Load test data
 npm run db:seed
@@ -188,17 +192,20 @@ npm run db:seed
 npm run dev
 ```
 
-> Steps 4 and 5 use `backend/sql/schema.sql` and the `backend` `db:seed` npm script.
+> If PostgreSQL is installed in another folder, replace the `psql.exe` path
+> with the path on that computer. The PostgreSQL service must be running.
+> `DB_PASSWORD` in `.env` must be the password for the PostgreSQL user, not a
+> BookHaven account password.
 
 The seed script creates test accounts for each role so you can log in right away. The development credentials are listed below. **For development only.**
 
 The backend runs on `http://localhost:3000` and the Vite frontend runs on `http://localhost:5173`.
 
-### Sprint 4 MVP run and test commands
+### Run the application
 
-The Sprint 4 implementation includes buyer cart/checkout/order history/refund requests,
-seller order fulfillment/refund decisions, and administrator order/refund oversight.
-Apply the schema after pulling changes, then reseed the development database:
+The application includes buyer cart, checkout, order history, and refund
+requests; seller fulfillment and refund decisions; and administrator order
+and refund oversight.
 
 ```powershell
 cd backend
@@ -209,14 +216,24 @@ npm run db:seed
 Run the API and frontend in separate terminals:
 
 ```powershell
-# terminal 1
+# terminal 1: API
 cd backend
 npm run dev
 
-# terminal 2
+# terminal 2: frontend
 cd frontend
 npm run dev
 ```
+
+Check the API before opening the frontend:
+
+```powershell
+Invoke-WebRequest http://localhost:3000/api/health
+```
+
+The response should contain `"status":"ok"`. Then open
+`http://localhost:5173` in a browser. The frontend calls the API at
+`http://localhost:3000`, so the API must be running first.
 
 Development accounts:
 
@@ -239,6 +256,40 @@ cd ..\frontend
 npm run build
 npm run lint
 ```
+
+### Connection troubleshooting
+
+**`psql is not recognized`**
+
+Use the full path:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" --version
+```
+
+Replace `18` if a different PostgreSQL version is installed.
+
+**`password authentication failed for user "postgres"`**
+
+Update `DB_PASSWORD` in `backend\.env` to the password selected when
+PostgreSQL was installed. The value in `.env.example` is only a placeholder.
+
+**`database "bookhaven" does not exist`**
+
+Run the database creation command from the setup section, then apply
+`backend\sql\schema.sql` and run `npm run db:seed` from `backend`.
+
+**`ECONNREFUSED 127.0.0.1:5432`**
+
+Start the PostgreSQL Windows service and retry the schema or seed command.
+PostgreSQL must be listening on port `5432`, unless `DB_PORT` in
+`backend\.env` has been changed.
+
+**The API health check works but login or books fail**
+
+The API is running, but the database connection or seed data is not ready.
+Check `backend\.env`, run `npm run db:seed` from `backend`, and use one of the
+seeded accounts listed below.
 
 Testing and traceability deliverables are in [docs/](./docs/):
 
