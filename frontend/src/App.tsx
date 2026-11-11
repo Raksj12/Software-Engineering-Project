@@ -14,6 +14,7 @@ import Checkout from "./Buyer/Checkout";
 import OrderHistory from "./Buyer/OrderHistory";
 import SellerHome from "./Seller/SellerHome";
 import AdminHome from "./Admin/AdminHome";
+import Notifications from "./Notifications/Notifications";
 
 type Role = "buyer" | "seller" | "admin";
 
@@ -108,6 +109,7 @@ function App() {
             <Link to="/wishlist">Wishlist</Link>
             <Link to="/profile">Profile</Link>
             <Link to="/login">Sign in</Link>
+            <Link to="/notifications">Notifications</Link>
           </nav>
         </header>
 
@@ -118,6 +120,7 @@ function App() {
           <Route path="/profile" element={<ProtectedPage roles={["buyer", "seller", "admin"]}><Profile /></ProtectedPage>} />
           <Route path="/reviews/write" element={<ProtectedPage roles={["buyer"]}><WriteReview /></ProtectedPage>} />
           <Route path="/wishlist" element={<ProtectedPage roles={["buyer"]}><ManageWishlist /></ProtectedPage>} />
+          <Route path="/notifications" element={<ProtectedPage roles={["buyer", "seller", "admin"]}><Notifications /></ProtectedPage>} />
 
           <Route path="/buyer" element={<ProtectedPage roles={["buyer"]}><BuyerHome /></ProtectedPage>} />
           <Route path="/buyer/books/:id" element={<ProtectedPage roles={["buyer"]}><BookDetails /></ProtectedPage>} />
