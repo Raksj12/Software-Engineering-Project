@@ -11,6 +11,8 @@ import BookDetails from "./Buyer/BookDetails";
 import BuyBook from "./Buyer/BuyBook";
 import SellerHome from "./Seller/SellerHome";
 import AdminHome from "./Admin/AdminHome";
+import Notifications, { NotificationsLink } from "./Notifications/Notifications";
+import Home from "./Home/Home";
 
 type Role = "buyer" | "seller" | "admin";
 
@@ -93,15 +95,17 @@ function App() {
   return (
     <BrowserRouter>
       <nav>
+        <Link to="/">Home</Link>{" | "}
         <Link to="/login">Login</Link>{" | "}
         <Link to="/register">Register</Link>{" | "}
         <Link to="/profile">Profile</Link>{" | "}
         <Link to="/reviews/write">Write Review</Link>{" | "}
-        <Link to="/wishlist">Wishlist</Link>
+        <Link to="/wishlist">Wishlist</Link>{" | "}
+        <NotificationsLink />
       </nav>
 
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/profile" element={<ProtectedPage roles={["buyer", "seller", "admin"]}><Profile /></ProtectedPage>} />
@@ -113,6 +117,7 @@ function App() {
         <Route path="/buyer/books/:id/buy" element={<ProtectedPage roles={["buyer"]}><BuyBook /></ProtectedPage>} />
         <Route path="/seller" element={<ProtectedPage roles={["seller"]}><SellerHome /></ProtectedPage>} />
         <Route path="/admin" element={<ProtectedPage roles={["admin"]}><AdminHome /></ProtectedPage>} />
+        <Route path="/notifications" element={<ProtectedPage roles={["buyer", "seller", "admin"]}><Notifications /></ProtectedPage>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

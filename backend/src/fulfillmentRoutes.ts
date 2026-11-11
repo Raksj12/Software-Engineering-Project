@@ -21,6 +21,7 @@ fulfillmentRouter.get("/", async (req, res) => {
   res.json({ items: result.rows });
 });
 
+// Returns true if the item moved to the new status, false if a response was already sent with an error.
 async function moveItem(
   req: Request,
   res: Response,
@@ -28,12 +29,12 @@ async function moveItem(
   to: string,
   extra: { carrier?: string; tracking?: string; reason?: string },
   message: (title: string) => string,
-): Promise<void> {
+): Promise<boolean> {
   const orderId = Number(req.params.orderId);
   const productId = Number(req.params.productId);
   if (!Number.isInteger(orderId) || !Number.isInteger(productId)) {
     res.status(400).json({ error: "Invalid order or product id." });
-    return;
+    return false;
   }
   const result = await pool.query(
     `UPDATE order_items oi
@@ -52,11 +53,12 @@ async function moveItem(
   );
   if (!result.rowCount) {
     res.status(409).json({ error: "Order item not found, not yours, or not in a valid state for this action." });
-    return;
+    return false;
   }
   const { buyerId, title } = result.rows[0];
   await createNotification(buyerId, message(title));
   res.json({ ok: true });
+  return true;
 }
 
 // pending -> processing
@@ -83,7 +85,18 @@ fulfillmentRouter.post("/:orderId/items/:productId/cancel", async (req, res) => 
     res.status(400).json({ error: "A cancellation reason is required." });
     return;
   }
- 
-  await moveItem(req, res, ["pending", "processing"], "cancelled", { reason },
+
+  const cancelled = await moveItem(req, res, ["pending", "processing"], "cancelled", { reason },
     (t) => `Your order for "${t}" was cancelled: ${reason}`);
+
+  // Put the books back in stock, only if the cancel actually happened.
+  // A repeat cancel returns 409 above, so stock is never restored twice.
+  if (cancelled) {
+    await pool.query(
+      `UPDATE products p SET stock = p.stock + oi.quantity, updated_at = NOW()
+       FROM order_items oi
+       WHERE oi.order_id = $1 AND oi.product_id = $2 AND p.id = oi.product_id`,
+      [Number(req.params.orderId), Number(req.params.productId)],
+    );
+  }
 });
