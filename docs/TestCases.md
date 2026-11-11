@@ -29,4 +29,4 @@ Actual results below reflect the validation performed during Sprint 4 implementa
 | TC-020 | Sprint 4 SRS: Buyer Refund Requests | Refund requires login | Integration | API available | Request refund without a token | Order ID 1 | 401 Unauthorized | Returned 401 | Pass |
 | TC-021 | REQ-036 | Refund requires reason | Integration | Buyer logged in | Submit an empty refund reason | Empty reason | 400 Bad Request | Returned 400 | Pass |
 | TC-022 | Sprint 4 SRS: Buyer Refund Requests | Invalid refund order ID | Integration | Buyer logged in | Submit refund with a negative order ID | Order ID -1 | 400 Bad Request | Returned 400 | Pass |
-| TC-023 | REQ-034 | Missing refund order | Integration | Buyer logged in | Request refund for a nonexistent order | Order ID 999999 | 404 Not Found | Returned 500 due to SQL parameter type error | Fail |
+| TC-023 | REQ-034 | Missing refund order | Integration | Buyer logged in | Request refund for a nonexistent order | Order ID 999999 | 404 Not Found | Returned 404 after correcting the refund SQL parameter binding | Pass |

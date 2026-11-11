@@ -28,11 +28,11 @@ ordersRouter.post("/:orderId/refund", async (req, res) => {
   }
   const result = await pool.query(
     `INSERT INTO refund_requests (order_id,buyer_id,reason)
-     SELECT id,buyer_id,$2 FROM orders
+     SELECT id,buyer_id,$3 FROM orders
      WHERE id=$1 AND buyer_id=$2 AND status IN ('paid','processing','shipped','delivered')
        AND refund_status='none'
      RETURNING id, order_id AS "orderId", status, reason, created_at AS "createdAt"`,
-    [orderId, req.user!.id],
+    [orderId, req.user!.id, reason],
   );
   if (!result.rowCount) {
     const existing = await pool.query("SELECT buyer_id, refund_status, status FROM orders WHERE id=$1", [orderId]);

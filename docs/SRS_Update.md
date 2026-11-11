@@ -1,10 +1,6 @@
 # BookHaven Software Requirements Specification — Sprint 4 Scope Revision
 
-The original SRS is available as the root-level PDF
-[`SRS_Latex__version_1 (1).pdf`](../SRS_Latex__version_1%20(1).pdf). Because that
-file is not an editable source document, this file is the authoritative
-Sprint 4 scope revision. It removes requirements that will not be delivered
-for the MVP and records the requirements that remain committed.
+
 
 ## ChangeLog
 
@@ -12,6 +8,7 @@ for the MVP and records the requirements that remain committed.
 |---|---|---|
 | 1.1 | 2026-11-08 | Added cart, checkout, order history, refunds, seller fulfillment, admin oversight, and review retrieval. |
 | 1.2 | 2026-11-08 | Reduced the MVP scope to the implemented local demonstration. Deferred production integrations and incomplete secondary workflows. |
+| 1.3 | 2026-11-11 | Verified the checkout and order implementation, recorded the current validation result, and clarified partial/deferred requirements. |
 
 ## Committed MVP requirements
 
@@ -66,3 +63,63 @@ The committed scope is implemented across the backend route modules under
 `backend/src/`, the PostgreSQL schema in `backend/sql/schema.sql`, and the
 buyer, seller, and admin pages under `frontend/src/`. The runnable setup and
 the known development limitations are documented in [`README.md`](../README.md).
+
+## Verification status — 2026-11-11
+
+The checkout and order code was reviewed in `backend/src/orders.ts`,
+`backend/src/cart.ts`, `backend/src/fulfillmentRoutes.ts`, and the
+corresponding buyer, seller, and administrator pages. The backend and frontend
+production builds completed successfully after installing dependencies from
+their existing lockfiles.
+
+The checkout and order behavior currently implemented is:
+
+- Buyer-only route protection for cart, checkout, order history, and refund
+  requests.
+- Cart checkout validates the shipping address and development card format,
+  locks cart rows, checks and decrements stock within a database transaction,
+  creates the order and order items, clears the cart after a successful
+  commit, and returns an order confirmation.
+- Buy-now checkout follows the same transactional stock and order-creation
+  behavior.
+- Raw card details are used only for format validation and are not written to
+  the database.
+- Order history is filtered by the authenticated buyer.
+- Buyers can submit a refund request with a required reason, and seller/admin
+  decisions update local refund and order status and notify the buyer.
+- Sellers can view their own order items, process and ship them with carrier
+  and tracking information, deliver or cancel eligible items, and notify
+  buyers of fulfillment changes.
+
+The following requirements must remain explicitly partial or deferred rather
+than being reported as fully complete:
+
+| Requirement area | Current verified state | SRS status |
+|---|---|---|
+| Itemized pre-payment order review | Checkout collects the shipping address and card-format fields, but does not render a separate itemized order summary before submission. | Partial; UI follow-up required |
+| Payment processing and failed-payment simulation | Only local card-format validation exists. There is no payment provider, real charge, or provider-failure test. Database errors and stock conflicts are transactionally rolled back. | Deferred |
+| Return-expiration enforcement | Refund eligibility is based on order state and refund status; no time-window/expiration rule is implemented. | Deferred |
+| Seller notification of a new refund request | Sellers can retrieve refund requests and decide them, but the buyer refund-request route does not create a seller notification. | Partial |
+| Digital delivery | The backend can create a digital-delivery token during checkout, but a complete buyer-facing delivery/access flow is not implemented. | Deferred |
+| Browser E2E/Newman execution | The scripts and collection exist, but no browser or Newman run was completed during this verification. | Deferred as validation work |
+
+### Automated verification result
+
+`backend` `npm run build`: **passed**.
+
+`frontend` `npm run build`: **passed**.
+
+`backend` `npm test`: **23 passed, 0 failed** against an isolated PostgreSQL
+18 test cluster. This includes authentication, order history, buyer isolation,
+refund validation, review validation, and wishlist validation. The run first
+exposed a PostgreSQL parameter-type defect in the missing-order refund branch;
+the query was corrected to bind the refund reason separately, and the complete
+suite passed after reseeding the database.
+
+Authenticated API smoke checks also passed for cart retrieval, adding an item,
+cart checkout, order creation, buyer order history, buyer refund request,
+seller order visibility, and administrator order visibility. The Newman
+collection executed all seven requests with no request failures, but it
+contains no assertions and does not persist the login token, so protected
+requests in that collection returned their expected unauthorized responses.
+Browser E2E and Newman assertion coverage remain follow-up validation work.

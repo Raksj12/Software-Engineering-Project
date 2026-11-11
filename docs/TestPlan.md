@@ -117,9 +117,10 @@ The tests check:
 ### 6.2 Test Results
 
 - Total tests: 7
-- Passed: 6
-- Failed: 1
+- Passed: 7
+- Failed: 0
 
-TC-023 failed because the refund endpoint returned HTTP 500 instead of the expected HTTP 404 for a nonexistent order. The error was caused by an SQL parameter type issue in `backend/src/orders.ts`.
-
-The issue still needs to be fixed and the test rerun.
+TC-023 initially returned HTTP 500 because the refund endpoint reused one SQL
+parameter as both a buyer ID and a text refund reason. The query in
+`backend/src/orders.ts` was corrected to bind the refund reason separately.
+The test was rerun against PostgreSQL and returned the expected HTTP 404.
