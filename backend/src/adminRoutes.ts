@@ -216,3 +216,44 @@ adminRouter.delete("/prohibited-words/:id", async (req, res) => {
   await logAction(req.user!.id, "remove_prohibited_word", "prohibited_word", id, result.rows[0].phrase);
   res.status(204).send();
 });
+
+adminRouter.get("/orders", async (req, res) => {
+  const status = typeof req.query.status === "string" ? req.query.status : null;
+  const result = await pool.query(
+    `SELECT o.id, o.buyer_id AS "buyerId", u.email AS "buyerEmail", o.status,
+            o.total_amount AS "totalAmount", o.shipping_address AS "shippingAddress",
+            o.refund_status AS "refundStatus", o.created_at AS "createdAt"
+     FROM orders o JOIN users u ON u.id=o.buyer_id
+     WHERE ($1::text IS NULL OR o.status=$1) ORDER BY o.created_at DESC`, [status],
+  );
+  res.json({ orders: result.rows });
+});
+
+adminRouter.get("/refunds", async (_req, res) => {
+  const result = await pool.query(
+    `SELECT rr.id, rr.order_id AS "orderId", rr.buyer_id AS "buyerId", u.email AS "buyerEmail",
+            rr.reason, rr.status, rr.reviewed_by AS "reviewedBy", rr.created_at AS "createdAt"
+     FROM refund_requests rr JOIN users u ON u.id=rr.buyer_id ORDER BY rr.created_at DESC`,
+  );
+  res.json({ refunds: result.rows });
+});
+
+adminRouter.post("/refunds/:id/:decision", async (req, res) => {
+  const decision = req.params.decision === "approve" ? "approved" : req.params.decision === "reject" ? "rejected" : "";
+  const id = Number(req.params.id);
+  if (!decision || !Number.isInteger(id) || id < 1) { res.status(400).json({ error: "Invalid refund decision." }); return; }
+  const result = await pool.query(
+    `UPDATE refund_requests SET status=$1, reviewed_by=$2, reviewed_at=NOW()
+     WHERE id=$3 AND status='requested' RETURNING order_id AS "orderId", buyer_id AS "buyerId"`,
+    [decision, req.user!.id, id],
+  );
+  if (!result.rowCount) { res.status(409).json({ error: "Refund not found or already reviewed." }); return; }
+  await pool.query(
+    `UPDATE orders SET refund_status=$1, status=CASE WHEN $1='approved' THEN 'refunded' ELSE status END,
+     refunded_at=CASE WHEN $1='approved' THEN NOW() ELSE refunded_at END, updated_at=NOW() WHERE id=$2`,
+    [decision, result.rows[0].orderId],
+  );
+  await createNotification(result.rows[0].buyerId, `Refund request for order #${result.rows[0].orderId} was ${decision}.`);
+  await logAction(req.user!.id, `${decision}_refund`, "refund", id);
+  res.json({ ok: true, status: decision });
+});

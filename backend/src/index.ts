@@ -13,6 +13,7 @@ import { notificationsRouter } from "./notifications.js";
 import { sellerListingsRouter } from "./sellerListings.js";
 import { ordersRouter } from "./orders.js";
 import { imagesRouter } from "./images.js";
+import cartRouter from "./cart.js";
 
 dotenv.config();
 
@@ -146,9 +147,12 @@ app.get("/api/auth/me", authRequired, async (req, res, next) => {
 app.patch("/api/auth/me", authRequired, async (req, res, next) => {
   try {
     // Get the updated name and email
-    const { fullName, email } = req.body as {
+    const { fullName, email, password, currentPassword, storeName } = req.body as {
       fullName?: string;
       email?: string;
+      password?: string;
+      currentPassword?: string;
+      storeName?: string;
     };
 
     // Clean up the user's input
@@ -164,14 +168,27 @@ app.patch("/api/auth/me", authRequired, async (req, res, next) => {
     }
 
     // Update the user's information in the database
+    if (password) {
+      if (!currentPassword || password.length < 8) {
+        res.status(400).json({ error: "Current password and a new password of at least 8 characters are required." });
+        return;
+      }
+      const current = await pool.query("SELECT password_hash FROM users WHERE id=$1", [req.user!.id]);
+      if (!current.rowCount || !verifyPassword(currentPassword, current.rows[0].password_hash)) {
+        res.status(401).json({ error: "Current password is incorrect." });
+        return;
+      }
+    }
     const result = await pool.query(
       `UPDATE users
        SET full_name = $1,
            email = $2,
+           store_name = $4,
+           password_hash = COALESCE($5, password_hash),
            updated_at = NOW()
        WHERE id = $3
-       RETURNING id, email, full_name AS "fullName", role, status`,
-      [name, newEmail, req.user!.id]
+       RETURNING id, email, full_name AS "fullName", store_name AS "storeName", role, status`,
+      [name, newEmail, req.user!.id, storeName?.trim() || null, password ? hashPassword(password) : null]
     );
 
     // Check if the user exists
@@ -242,7 +259,23 @@ app.use("/api/listings", searchRouter);
 app.use("/api/seller/orders", authRequired, requireRoles("seller"), fulfillmentRouter);
 app.use("/api/seller/listings", authRequired, requireRoles("seller"), sellerListingsRouter);
 app.use("/api/orders", authRequired, requireRoles("buyer"), ordersRouter);
+app.use("/api/cart", authRequired, requireRoles("buyer"), cartRouter);
 app.use("/api/images", imagesRouter);
+
+app.get("/api/products/:productId/reviews", async (req, res, next) => {
+  const productId = Number(req.params.productId);
+  if (!Number.isInteger(productId) || productId < 1) { res.status(400).json({ error: "Invalid product id." }); return; }
+  try {
+    const result = await pool.query(
+      `SELECT r.id, r.rating, r.body, r.created_at AS "createdAt", u.full_name AS "buyerName"
+       FROM reviews r JOIN users u ON u.id=r.buyer_id WHERE r.product_id=$1 ORDER BY r.created_at DESC`, [productId],
+    );
+    const average = result.rows.length
+      ? result.rows.reduce((sum, review) => sum + Number(review.rating), 0) / result.rows.length
+      : null;
+    res.json({ averageRating: average, reviews: result.rows });
+  } catch (error) { next(error); }
+});
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Page not found." });

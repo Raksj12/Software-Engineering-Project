@@ -1,0 +1,22 @@
+{
+  "info": {
+    "name": "BookHaven Sprint 4",
+    "_postman_id": "bookhaven-sprint4",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "token", "value": "" },
+    { "key": "orderId", "value": "1" },
+    { "key": "productId", "value": "1" }
+  ],
+  "item": [
+    { "name": "Health", "request": { "method": "GET", "url": "{{baseUrl}}/api/health" } },
+    { "name": "Login buyer", "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"email\":\"buyer@bookhaven.test\",\"password\":\"buyer123\"}" }, "url": "{{baseUrl}}/api/auth/login" } },
+    { "name": "Search listings", "request": { "method": "GET", "url": "{{baseUrl}}/api/listings?q=&field=title" } },
+    { "name": "Get cart", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/cart" } },
+    { "name": "Add product to cart", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"productId\":{{productId}},\"quantity\":1}" }, "url": "{{baseUrl}}/api/cart" } },
+    { "name": "Order history", "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/orders" } },
+    { "name": "Request refund", "request": { "method": "POST", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }, { "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\"reason\":\"Item arrived damaged\"}" }, "url": "{{baseUrl}}/api/orders/{{orderId}}/refund" } }
+  ]
+}

@@ -75,37 +75,28 @@ function Login() {
   }
 
   return (
-    <div>
-      <h2>Login</h2>
-
-      {!isLoggedIn ? (
-        <form onSubmit={handleLogin}>
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            required
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-          />
-
-          <button type="submit">Login</button>
-        </form>
-      ) : (
-        <button type="button" onClick={handleLogout}>
-          Logout
-        </button>
-      )}
-
-      <p>{message}</p>
-    </div>
+    <main className="page auth-layout">
+      <section>
+        <p className="eyebrow">Welcome to BookHaven</p>
+        <h1>Good books find good homes.</h1>
+        <p className="muted">Sign in to browse independent sellers, save favorites, and finish your next great read.</p>
+      </section>
+      <section className="form-card">
+        <p className="eyebrow">Member sign in</p>
+        <h2>Welcome back</h2>
+        {!isLoggedIn ? (
+          <form onSubmit={handleLogin}>
+            <input aria-label="Email" type="email" placeholder="Email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <input aria-label="Password" type="password" placeholder="Password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+            <button type="submit">Sign in</button>
+          </form>
+        ) : (
+          <button type="button" onClick={handleLogout}>Log out</button>
+        )}
+        {message && <p className="status-message">{message}</p>}
+        <p className="helper-text">New to BookHaven? <a href="/register">Create an account</a></p>
+      </section>
+    </main>
   );
 }
 

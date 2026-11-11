@@ -40,9 +40,11 @@ function Register() {
 
   // Display the registration form
   return (
-    <div>
-      <h2>Create Account</h2>
-
+    <main className="page page-narrow">
+      <section className="form-card">
+      <p className="eyebrow">Join the community</p>
+      <h2>Create your account</h2>
+      <p className="muted">Buy your next favorite book or start sharing your own collection.</p>
       <form onSubmit={handleRegister}>
         <input
           type="text"
@@ -81,9 +83,9 @@ function Register() {
 
         <button type="submit">Register</button>
       </form>
-
-      <p>{message}</p>
-    </div>
+      {message && <p className="status-message">{message}</p>}
+      </section>
+    </main>
   );
 }
 

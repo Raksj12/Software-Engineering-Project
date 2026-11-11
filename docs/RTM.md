@@ -1,0 +1,63 @@
+# BookHaven Requirements Traceability Matrix
+
+The available repository SRS defines REQ-1 through REQ-57. The Lab Topic PDF referenced by the Sprint 4 request was not present in the repository, so this matrix is based on the available SRS.
+
+| ID | Technical Assumption(s) and/or Customer Need(s) | Functional Requirement | Status | Test Case Number | Implemented In | Additional Comments |
+|---|---|---|---|---|---|---|
+| REQ-001 | Users need role accounts | The system shall allow a new user to register as either a Buyer or a Seller. | Completed | TC-001 | backend/src/index.ts, frontend/src/Account/Register.tsx | SRS 3.1 |
+| REQ-002 | Registration must be valid | The system shall reject incomplete or duplicate registration. | Completed | TC-001 | backend/src/index.ts | SRS 3.1 |
+| REQ-003 | Users need role access | The system shall authenticate users and redirect by role. | Completed | TC-001 | backend/src/index.ts, frontend/src/Account/Login.tsx | SRS 3.1 |
+| REQ-004 | Credentials must not leak detail | The system shall return a generic invalid-login error. | Completed | TC-002 | backend/src/index.ts | SRS 3.1 |
+| REQ-005 | Users need logout | The system shall allow logged-in users to log out. | Completed | TC-001 | backend/src/index.ts, frontend/src/Account/Login.tsx | SRS 3.1 |
+| REQ-006 | Users need profile maintenance | The system shall allow users to edit permitted account information. | Completed | TC-015 | backend/src/index.ts, frontend/src/Account/Profile.tsx | Password/store-name workflow deferred; permitted profile fields are supported |
+| REQ-007 | Sessions must expire | The system shall end inactive sessions after 30 minutes. | Deferred | TC-015 | backend/src/auth.ts | Fixed-lifetime development token is used; inactivity reset is out of MVP scope |
+| REQ-008 | Sellers need listings | The system shall allow sellers to create complete listings with optional images. | Completed | TC-004 | backend/src/sellerListings.ts, frontend/src/Seller/SellerHome.tsx | SRS 3.2 |
+| REQ-009 | ISBN must be valid | The system shall validate ISBN-10 and ISBN-13 checksums. | Completed | TC-003 | backend/src/isbn.ts | SRS 3.2 |
+| REQ-010 | Listings require moderation | The system shall place new/materially edited listings into pending review. | In Progress | TC-004 | backend/src/sellerListings.ts | Edit review behavior incomplete |
+| REQ-011 | Sellers need editing | The system shall allow sellers to edit their own listings. | Completed | TC-004 | backend/src/sellerListings.ts | UI edit control remains limited |
+| REQ-012 | Sellers need deletion | The system shall allow sellers to remove their own listings. | Completed | TC-004 | backend/src/sellerListings.ts | UI delete control remains limited |
+| REQ-013 | Stock must be enforced | The system shall label and prevent purchase of zero-stock listings. | Completed | TC-008 | backend/src/cart.ts, backend/src/orders.ts | SRS 3.2 |
+| REQ-014 | Ownership must be enforced | The system shall restrict seller listing actions to their own listings. | Completed | TC-004 | backend/src/sellerListings.ts | SRS 3.2 |
+| REQ-015 | Admins need a queue | The system shall show pending listings ordered by submission date. | Completed | TC-004 | backend/src/adminRoutes.ts | SRS 3.3 |
+| REQ-016 | Admins approve listings | The system shall publish approved listings. | Completed | TC-004 | backend/src/adminRoutes.ts | SRS 3.3 |
+| REQ-017 | Admins reject listings | The system shall reject listings with a reason. | Completed | TC-004 | backend/src/adminRoutes.ts | SRS 3.3 |
+| REQ-018 | Sellers need moderation notices | The system shall notify sellers of moderation decisions. | Completed | TC-004 | backend/src/notifications.ts, backend/src/adminRoutes.ts | In-app notifications |
+| REQ-019 | Prohibited content needs flags | The system shall flag prohibited words/phrases. | Completed | TC-004 | backend/src/adminRoutes.ts | SRS 3.3 |
+| REQ-020 | Review must revalidate ISBN | The system shall block approval of invalid ISBNs. | Completed | TC-004 | backend/src/adminRoutes.ts | SRS 3.3 |
+| REQ-021 | Buyers need search | The system shall search published listings by title, author, genre, or ISBN. | Completed | TC-005 | backend/src/searchRoutes.ts, frontend/src/Buyer/BuyerHome.tsx | SRS 3.4 |
+| REQ-022 | Search must be predictable | The system shall sort results alphabetically by title. | Completed | TC-005 | backend/src/searchRoutes.ts | SRS 3.4 |
+| REQ-023 | Empty searches need feedback | The system shall show a no-results message. | Completed | TC-005 | backend/src/searchRoutes.ts, frontend/src/Buyer/BuyerHome.tsx | SRS 3.4 |
+| REQ-024 | Buyers need browsing | The system shall allow browse by genre. | Deferred | TC-005 | backend/src/searchRoutes.ts | Genre filtering remains available; separate grouped browse UI is out of MVP scope |
+| REQ-025 | Buyers need details | The system shall display complete listing details. | Completed | TC-013 | frontend/src/Buyer/BookDetails.tsx | SRS 3.4 |
+| REQ-026 | Unpublished products stay hidden | The system shall exclude non-published listings from search/browse. | Completed | TC-005 | backend/src/searchRoutes.ts | SRS 3.4 |
+| REQ-027 | Buyers need a cart | The system shall allow in-stock published products in a cart. | Completed | TC-006 | backend/src/cart.ts, frontend/src/Buyer/Cart.tsx | SRS 3.5 |
+| REQ-028 | Cart totals must update | The system shall allow cart view/removal and subtotal updates. | Completed | TC-006 | backend/src/cart.ts, frontend/src/Buyer/Cart.tsx | SRS 3.5 |
+| REQ-029 | Checkout requires authentication | The system shall require login before checkout. | Completed | TC-007 | backend/src/index.ts, frontend/src/App.tsx | SRS 3.5 |
+| REQ-030 | Buyers need order review | The system shall display an itemized order summary before payment. | In Progress | TC-007 | frontend/src/Buyer/Checkout.tsx | Summary UI should be expanded |
+| REQ-031 | Card data must be protected | The system shall use payment processing without storing raw card data. | In Progress | TC-007 | backend/src/orders.ts | Development payment stub |
+| REQ-032 | Successful payment creates order | The system shall decrement stock and create a permanent order. | Completed | TC-007 | backend/src/orders.ts | SRS 3.5 |
+| REQ-033 | Failed payment must rollback | The system shall leave stock/orders unchanged after failed payment. | In Progress | TC-008 | backend/src/orders.ts | Gateway failure simulation incomplete |
+| REQ-034 | Buyers need returns | The system shall allow eligible return requests. | Completed | TC-009 | backend/src/orders.ts | Configurable window needs extraction |
+| REQ-035 | Expired returns must fail | The system shall reject expired return requests. | In Progress | TC-009 | backend/src/orders.ts | Date-window enforcement incomplete |
+| REQ-036 | Refunds need reasons | The system shall require a refund reason. | Completed | TC-009 | backend/src/orders.ts | SRS 3.6 |
+| REQ-037 | Sellers need refund notices | The system shall notify relevant sellers of refund requests. | In Progress | TC-009 | backend/src/orders.ts, backend/src/notifications.ts | Notification wiring needs seller lookup |
+| REQ-038 | Approved refunds update orders | The system shall refund approved requests and mark orders refunded. | Completed | TC-010 | backend/src/fulfillmentRoutes.ts, backend/src/adminRoutes.ts | Development refund stub |
+| REQ-039 | Buyers need refund decisions | The system shall notify buyers of refund decisions. | Completed | TC-010 | backend/src/fulfillmentRoutes.ts, backend/src/adminRoutes.ts | SRS 3.6 |
+| REQ-040 | Sellers need sales visibility | The system shall show sellers their own order items and buyer shipping data. | Completed | TC-011 | backend/src/fulfillmentRoutes.ts, frontend/src/Seller/SellerHome.tsx | SRS 3.7 |
+| REQ-041 | Sellers need fulfillment controls | The system shall allow processing and shipping with tracking. | Completed | TC-011 | backend/src/fulfillmentRoutes.ts | SRS 3.7 |
+| REQ-042 | Buyers need tracking notices | The system shall notify buyers when orders ship. | Completed | TC-011 | backend/src/fulfillmentRoutes.ts | SRS 3.7 |
+| REQ-043 | Sellers need cancellation/refunds | The system shall allow unshipped cancellation and refund. | In Progress | TC-011 | backend/src/fulfillmentRoutes.ts | Payment refund stub |
+| REQ-044 | Cancellations need notices | The system shall notify buyers of cancellation reasons. | Completed | TC-011 | backend/src/fulfillmentRoutes.ts | SRS 3.7 |
+| REQ-045 | Digital products need auto-delivery | The system shall generate and deliver digital access tokens. | Deferred | TC-016 | Not implemented | Complete digital-product delivery is out of MVP scope |
+| REQ-046 | Digital sellers need notices | The system shall notify sellers of digital fulfillment. | Deferred | TC-016 | Not implemented | Complete digital-product delivery is out of MVP scope |
+| REQ-047 | Reviews require delivery | The system shall allow reviews only for delivered purchases. | Completed | TC-012 | backend/src/reviews.ts | SRS 3.8 |
+| REQ-048 | One review per product | The system shall prevent duplicate reviews. | Completed | TC-012 | backend/sql/schema.sql, backend/src/reviews.ts | SRS 3.8 |
+| REQ-049 | Reviews need moderation | The system shall screen reviews for prohibited content. | Completed | TC-012 | backend/src/reviews.ts | SRS 3.8 |
+| REQ-050 | Bad reviews must be withheld | The system shall reject prohibited reviews with an explanation. | Completed | TC-012 | backend/src/reviews.ts | SRS 3.8 |
+| REQ-051 | Reviews need ratings | The system shall require a star rating. | Completed | TC-012 | backend/src/reviews.ts, frontend/src/Reviews/WriteReview.tsx | SRS 3.8 |
+| REQ-052 | Buyers need review display | The system shall show average and individual reviews. | In Progress | TC-013 | backend/src/index.ts, frontend/src/Buyer/BookDetails.tsx | Average not yet calculated |
+| REQ-053 | Buyers need wishlists | The system shall allow buyers to add books to wishlists. | Completed | TC-014 | backend/src/wishlist.ts | SRS 3.9 |
+| REQ-054 | Wishlist duplicates need feedback | The system shall reject duplicate wishlist entries. | Completed | TC-014 | backend/src/wishlist.ts | SRS 3.9 |
+| REQ-055 | Wishlist contents need display | The system shall display all saved wishlist books. | Completed | TC-014 | frontend/src/Wishlist/ManageWishlist.tsx | SRS 3.9 |
+| REQ-056 | Wishlist removal | The system shall allow wishlist removal with confirmation. | Completed | TC-014 | backend/src/wishlist.ts, frontend/src/Wishlist/ManageWishlist.tsx | SRS 3.9 |
+| REQ-057 | Unavailable wishlist entries persist | The system shall mark unavailable saved books without deleting them. | Completed | TC-014 | backend/src/wishlist.ts, frontend/src/Wishlist/ManageWishlist.tsx | SRS 3.9 |

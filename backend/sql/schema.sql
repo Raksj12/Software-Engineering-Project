@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS store_name TEXT;
 
 CREATE TABLE IF NOT EXISTS products (
   id BIGSERIAL PRIMARY KEY,
@@ -25,6 +26,9 @@ CREATE TABLE IF NOT EXISTS products (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE products ADD COLUMN IF NOT EXISTS listing_type TEXT NOT NULL DEFAULT 'physical'
+  CHECK (listing_type IN ('physical', 'digital'));
+ALTER TABLE products ADD COLUMN IF NOT EXISTS digital_url TEXT;
 
 CREATE TABLE IF NOT EXISTS wishlists (
   buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -68,12 +72,17 @@ CREATE TABLE IF NOT EXISTS cart_items (
 CREATE TABLE IF NOT EXISTS orders (
   id BIGSERIAL PRIMARY KEY,
   buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded')),
   total_amount NUMERIC(10, 2) NOT NULL CHECK (total_amount >= 0),
   shipping_address TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_status TEXT NOT NULL DEFAULT 'none'
+  CHECK (refund_status IN ('none', 'requested', 'approved', 'rejected', 'completed'));
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_reason TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS order_items (
   order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -113,6 +122,27 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS fulfillment_status TEXT NOT NUL
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS carrier TEXT;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS tracking_number TEXT;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+
+CREATE TABLE IF NOT EXISTS refund_requests (
+  id BIGSERIAL PRIMARY KEY,
+  order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'requested' CHECK (status IN ('requested', 'approved', 'rejected', 'completed')),
+  reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  reviewed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (order_id)
+);
+CREATE INDEX IF NOT EXISTS refund_requests_status_idx ON refund_requests(status);
+
+CREATE TABLE IF NOT EXISTS digital_deliveries (
+  order_id BIGINT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+  access_token TEXT NOT NULL UNIQUE,
+  delivered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
 
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id);
 

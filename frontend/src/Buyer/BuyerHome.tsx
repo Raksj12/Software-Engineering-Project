@@ -59,10 +59,25 @@ function BuyerHome() {
   }
 
   return (
-    <div>
-      <h2>Books for Sale</h2>
+    <main className="page">
+      <section className="hero-panel">
+        <div>
+          <p className="eyebrow">Find your next chapter</p>
+          <h1>Stories worth bringing home.</h1>
+          <p>Browse thoughtfully curated books from independent sellers and discover something new to read.</p>
+        </div>
+        <div className="hero-art" aria-hidden="true" />
+      </section>
 
-      <form onSubmit={handleSearch}>
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">The collection</p>
+          <h2>Books for sale</h2>
+        </div>
+        <span className="pill">{books.length} {books.length === 1 ? "book" : "books"}</span>
+      </div>
+
+      <form className="search-bar" onSubmit={handleSearch}>
         <select value={field} onChange={(event) => setField(event.target.value)}>
           <option value="title">Title</option>
           <option value="author">Author</option>
@@ -80,31 +95,29 @@ function BuyerHome() {
         <button type="submit">Search</button>
       </form>
 
-      <p>{message}</p>
+      {message && <p className="status-message">{message}</p>}
 
-      <ul>
+      <ul className="book-grid">
         {books.map((book) => (
-          <li key={book.id}>
+          <li className="book-card" key={book.id}>
             {book.imagePath && (
               <Link to={`/buyer/books/${book.id}`}>
-                <img src={`http://localhost:3000${book.imagePath}`} alt={`Cover of ${book.title}`} width={100} />
+                <img className="book-cover" src={`http://localhost:3000${book.imagePath}`} alt={`Cover of ${book.title}`} />
               </Link>
             )}
-            <h3>
-              <Link to={`/buyer/books/${book.id}`}>{book.title}</Link>
-            </h3>
-            <p>by {book.author}</p>
-            <p>${Number(book.price).toFixed(2)}</p>
-            <p>
-              Genre: {book.genre} | Condition: {book.condition} | ISBN: {book.isbn}
-            </p>
-            <p>Sold by {book.sellerName}</p>
-            <p>{book.outOfStock ? "Out of Stock" : `${book.stock} in stock`}</p>
-            <Link to={`/buyer/books/${book.id}`}>View details</Link>
+            {!book.imagePath && <div className="book-cover">No cover image</div>}
+            <div className="book-card-content">
+              <h3><Link to={`/buyer/books/${book.id}`}>{book.title}</Link></h3>
+              <p className="muted">by {book.author}</p>
+              <p className="price">${Number(book.price).toFixed(2)}</p>
+              <p className="muted">{book.genre} · {book.condition}</p>
+              <p className="muted">{book.outOfStock ? "Out of stock" : `${book.stock} in stock`} · {book.sellerName}</p>
+              <Link className="button secondary" to={`/buyer/books/${book.id}`}>View details</Link>
+            </div>
           </li>
         ))}
       </ul>
-    </div>
+    </main>
   );
 }
 

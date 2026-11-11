@@ -14,6 +14,7 @@ type BookDetail = {
   sellerName: string;
   imagePath: string | null;
 };
+type Review = { id: number; rating: number; body: string; createdAt: string; buyerName: string };
 
 // Get one published book by its id
 async function fetchBook(id: string) {
@@ -32,6 +33,8 @@ function BookDetails() {
   const navigate = useNavigate();
   const [book, setBook] = useState<BookDetail | null>(null);
   const [message, setMessage] = useState("Loading...");
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [averageRating, setAverageRating] = useState<number | null>(null);
 
   useEffect(() => {
     fetchBook(id)
@@ -43,41 +46,68 @@ function BookDetails() {
         setBook(null);
         setMessage(error instanceof TypeError ? "Could not connect to the server." : error.message);
       });
+    fetch(`http://localhost:3000/api/products/${id}/reviews`)
+      .then((response) => response.json())
+      .then((data) => {
+        setReviews(data.reviews || []);
+        setAverageRating(data.averageRating ?? null);
+      })
+      .catch(() => undefined);
   }, [id]);
 
-  return (
-    <div>
-      <Link to="/buyer">Back to Books for Sale</Link>
+  async function addToCart() {
+    const token = sessionStorage.getItem("authToken");
+    const response = await fetch("http://localhost:3000/api/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ productId: Number(id), quantity: 1 }),
+    });
+    const data = await response.json();
+    setMessage(response.ok ? "Book added to cart." : data.error || "Could not add book to cart.");
+  }
 
-      <p>{message}</p>
+  return (
+    <main className="page">
+      <Link className="muted" to="/buyer">← Back to books</Link>
 
       {book && (
-        <div>
+        <div className="detail-layout" style={{ marginTop: "28px" }}>
           {book.imagePath && (
-            <img src={`http://localhost:3000${book.imagePath}`} alt={`Cover of ${book.title}`} width={200} />
+            <img className="detail-cover" src={`http://localhost:3000${book.imagePath}`} alt={`Cover of ${book.title}`} />
           )}
-          <h2>{book.title}</h2>
-          <p>by {book.author}</p>
-          <p>${Number(book.price).toFixed(2)}</p>
-          <p>{book.stock === 0 ? "Out of Stock" : `${book.stock} in stock`}</p>
+          {!book.imagePath && <div className="book-cover detail-cover">No cover image</div>}
+          <div className="detail-info">
+          <p className="eyebrow">{book.genre} · {book.condition}</p>
+          <h1>{book.title}</h1>
+          <p className="muted">by {book.author} · sold by {book.sellerName}</p>
+          <p className="price">${Number(book.price).toFixed(2)}</p>
+          <p className="pill">{book.stock === 0 ? "Out of stock" : `${book.stock} available`}</p>
 
           {book.stock > 0 && (
-            <button type="button" onClick={() => navigate(`/buyer/books/${book.id}/buy`)}>
-              Buy Now
-            </button>
+            <div className="button-row">
+              <button type="button" onClick={() => navigate(`/buyer/books/${book.id}/buy`)}>Buy Now</button>
+              <button className="secondary" type="button" onClick={addToCart}>Add to Cart</button>
+            </div>
           )}
 
           <h3>Description</h3>
-          <p>{book.description || "No description provided."}</p>
+          <p className="muted">{book.description || "No description provided."}</p>
 
           <h3>Details</h3>
-          <p>Genre: {book.genre}</p>
-          <p>Condition: {book.condition}</p>
-          <p>ISBN: {book.isbn}</p>
-          <p>Sold by {book.sellerName}</p>
+          <p className="muted">ISBN: {book.isbn}</p>
+          <h3>Reviews</h3>
+          <p className="pill">★ {averageRating === null ? "No ratings yet" : `${averageRating.toFixed(1)}/5`}</p>
+          {reviews.length === 0 ? <p>No reviews yet.</p> : reviews.map((review) => (
+            <div className="panel form-card" key={review.id}>
+              <p>{review.rating}/5 by {review.buyerName}</p>
+              <p className="muted">{review.body}</p>
+            </div>
+          ))}
+          </div>
         </div>
       )}
-    </div>
+      {message && !book && <p className="status-message">{message}</p>}
+    </main>
   );
 }
 

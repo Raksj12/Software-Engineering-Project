@@ -21,6 +21,35 @@ sellerListingsRouter.get("/", async (req, res) => {
   res.json({ listings: result.rows });
 });
 
+sellerListingsRouter.patch("/:id", async (req, res) => {
+  const listingId = Number(req.params.id);
+  if (!Number.isInteger(listingId) || listingId < 1) { res.status(400).json({ error: "Invalid listing id." }); return; }
+  const body = req.body ?? {};
+  const title = text(body.title), author = text(body.author), genre = text(body.genre), description = text(body.description);
+  const condition = text(body.condition).toLowerCase();
+  const price = Number(body.price), stock = Number(body.stock);
+  if (!title || !author || !genre || !description || !CONDITIONS.includes(condition) ||
+      !Number.isFinite(price) || price < 0 || !Number.isInteger(stock) || stock < 0) {
+    res.status(400).json({ error: "Valid title, author, genre, description, condition, price, and stock are required." }); return;
+  }
+  const result = await pool.query(
+    `UPDATE products SET title=$1, author=$2, genre=$3, description=$4, condition=$5, price=$6, stock=$7,
+       status=CASE WHEN status='approved' THEN 'pending' ELSE status END, updated_at=NOW()
+     WHERE id=$8 AND seller_id=$9 RETURNING ${LISTING_COLUMNS}`,
+    [title, author, genre, description, condition, price, stock, listingId, req.user!.id],
+  );
+  if (!result.rowCount) { res.status(404).json({ error: "Listing not found." }); return; }
+  res.json({ listing: result.rows[0] });
+});
+
+sellerListingsRouter.delete("/:id", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isInteger(id) || id < 1) { res.status(400).json({ error: "Invalid listing id." }); return; }
+  const result = await pool.query("DELETE FROM products WHERE id=$1 AND seller_id=$2 AND NOT EXISTS (SELECT 1 FROM order_items WHERE product_id=$1) RETURNING id", [id, req.user!.id]);
+  if (!result.rowCount) { res.status(409).json({ error: "Listing not found or has existing orders." }); return; }
+  res.status(204).send();
+});
+
 // New listings start as pending until an admin approves them.
 // Sent as multipart/form-data so an optional cover image can be included.
 sellerListingsRouter.post("/", uploadImage, async (req, res) => {

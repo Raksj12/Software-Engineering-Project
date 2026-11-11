@@ -11,7 +11,7 @@ export interface AuthUser {
   status: UserStatus;
 }
 
-const TOKEN_TTL_SECONDS = 60 * 60 * 8;
+const TOKEN_TTL_SECONDS = 60 * 30;
 
 function secret(): string {
   return process.env.AUTH_SECRET || "development-only-change-me";
