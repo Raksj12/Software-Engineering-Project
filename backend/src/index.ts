@@ -108,7 +108,7 @@ app.post("/api/auth/login", async (req, res, next) => {
       return;
     }
     const authUser: AuthUser = { id: user.id, email: user.email, fullName: user.fullName, role: user.role, status: user.status };
-    res.json({ token: createToken(authUser), user: authUser, expiresIn: "8h" });
+    res.json({ token: createToken(authUser), user: authUser, expiresIn: "2h" });
   } catch (error) {
     next(error);
   }
