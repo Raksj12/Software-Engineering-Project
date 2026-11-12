@@ -12,7 +12,7 @@ BookHaven lets sellers list books for sale, lets buyers search, browse, and purc
 - [Team](#team)
 - [Core Concept](#core-concept)
 - [User Roles](#user-roles)
-- [Full Feature Set (v1.0 Vision)](#full-feature-set-v10-vision)
+- [Current MVP Feature Set](#current-mvp-feature-set)
 - [Sprint Scope](#sprint-scope)
 - [Tech Stack](#tech-stack)
 - [System Architecture](#system-architecture)
@@ -66,17 +66,20 @@ This review gate is central to the product: nothing a seller submits is visible 
 | **Seller** | Register/login, create/edit/remove listings, fulfill & ship orders, cancel orders, issue refunds | Account (self-registered) |
 | **Administrator** | Review pending listings and accounts, approve/reject with a reason, moderate reviews, maintain the prohibited-content word list | Account (created directly by the platform operator, not self-registered) |
 
-## Full Feature Set (v1.0 Vision)
+## Current MVP Feature Set
 
-The complete Software Requirements Specification defines nine system features, REQ-1 through REQ-57. This README summarizes them; see [`SRS_Latex__version_1__1_.pdf`](./SRS_Latex__version_1__1_.pdf) for the full requirement text, priorities, and stimulus/response sequences.
+The original SRS defines nine system features, REQ-1 through REQ-57. Sprint 4
+delivers the local MVP subset described in
+[`docs/SRS_Update.md`](./docs/SRS_Update.md). The original PDF remains the
+historical requirements baseline; deferred items are not claimed as completed.
 
-1. **User Account Management** — registration (Buyer/Seller), login/logout, 30-minute inactivity session timeout, profile editing. Account type can't be changed after registration.
+1. **User Account Management** — registration (Buyer/Seller), login/logout, fixed-lifetime development tokens, and permitted profile editing. Account type can't be changed after registration.
 2. **Book Listing Management** — sellers create, edit, and remove their own listings. ISBN is validated (ISBN-10/13 checksum) before submission. Zero-stock listings are auto-labeled "Out of Stock" and can't be added to a cart.
 3. **Listing Review and Approval** — admins work a "Pending Review" queue ordered by submission date, approve or reject (with a required reason) each listing, and get an automatic flag if a listing's title/description matches a maintained prohibited-word list. ISBNs are re-validated at review time.
 4. **Search and Browse** — buyers search published listings by title, author, genre, or ISBN, or browse by genre. Results are sorted alphabetically by title; unmatched searches show a clear "no results" message.
-5. **Shopping Cart and Checkout** — add/remove cart items with live subtotal updates, login-gated checkout, an itemized order summary before payment, and processing through a third-party payment gateway. BookHaven never stores raw card data.
-6. **Returns and Refunds** — buyers can request a return within a configurable eligibility window (e.g., 30 days), must provide a reason, and get notified when the request is approved/denied. Approval triggers a refund through the payment gateway.
-7. **Order Fulfillment** — sellers process physical orders (mark "Processing," attach carrier + tracking) or cancel unshipped orders with an automatic refund. Digital listings are fulfilled automatically — the system generates and delivers an access token/license the moment payment is confirmed, no seller action needed.
+5. **Shopping Cart and Checkout** — add/remove cart items with live subtotal updates, login-gated checkout, order creation, transactional stock updates, and development payment-format validation. No real payment gateway is connected.
+6. **Returns and Refunds** — buyers can request a refund with a reason, and sellers or administrators can approve or deny it. The demo updates local order/refund state; it does not issue a real payment refund.
+7. **Order Fulfillment** — sellers process physical orders, attach carrier/tracking information, mark delivery, or cancel eligible orders. The complete digital-product delivery experience is deferred.
 8. **Reviews and Ratings** — a buyer can leave one star rating + written review per book, but only after their order for that book is marked "Delivered." Every review is screened against the prohibited-content list before publishing.
 9. **Wishlist** — buyers save books for later, get notified of duplicates instead of creating them, and see saved-but-now-unavailable books marked rather than silently removed.
 
@@ -101,7 +104,10 @@ The goal of Sprint 3 is to get the web app all the way to the final confirmation
 | **Data population script** | Seed script that loads test users (all roles), products in each status, reviews, wishlist items, and prohibited words |
 | **Image/file storage** | Upload, store, and serve product cover images |
 
-**Deferred to later sprints:** payment gateway processing and order completion, Returns & Refunds, Order Fulfillment (§3.5 payment, §3.6, §3.7). These are fully specified in the SRS.
+The Sprint 4 scope revision supersedes this earlier planning note. Checkout
+completion, order history, refunds, and fulfillment are now included in the
+local MVP. Production payment processing, complete digital delivery, and the
+other deferred items are listed in [`docs/SRS_Update.md`](./docs/SRS_Update.md).
 
 ## Tech Stack
 
@@ -113,8 +119,8 @@ Per the SRS's Operating Environment (§2.4), development and testing run on `loc
 | Backend | Node.js + Express |
 | Database | PostgreSQL (local instance for development) |
 | Image storage | Local file uploads served by the Express server (e.g., `multer`) |
-| Payments | Third-party payment gateway (provider TBD) — no raw card data ever touches BookHaven's own servers |
-| Notifications | Email / in-app notification service (provider TBD) |
+| Payments | Development payment-format validation; no real charge is made |
+| Notifications | In-app notifications used by the local MVP |
 
 A hosted production environment (cloud platform or Linux server) hasn't been selected yet and will be chosen once the core application is functional.
 
@@ -147,11 +153,15 @@ All three client roles (Buyer, Seller, Admin) talk to a single Express applicati
 - [PostgreSQL](https://www.postgresql.org/download/) running locally
 - npm (comes with Node.js)
 
-### Setup
+### Setup from a clean clone
+
+The commands below are for Windows PowerShell. If PostgreSQL was installed
+with the default Windows installer, use the full `psql.exe` path because
+`psql` may not be added to PATH automatically.
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Raksj12/Software-Engineering-Project.git
+git clone --branch buildup-general https://github.com/Raksj12/Software-Engineering-Project.git
 cd Software-Engineering-Project
 
 # 2. Install backend and frontend dependencies
@@ -172,8 +182,8 @@ cd ..\backend
 copy .env.example .env
 
 # 4. Create the local BookHaven database and apply the schema
-psql -U your_postgres_user -c "CREATE DATABASE bookhaven;"
-psql -U your_postgres_user -d bookhaven -f sql/schema.sql
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -c "CREATE DATABASE bookhaven;"
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d bookhaven -f ".\sql\schema.sql"
 
 # 5. (Optional but recommended) Load test data
 npm run db:seed
@@ -182,11 +192,111 @@ npm run db:seed
 npm run dev
 ```
 
-> Steps 4 and 5 use `backend/sql/schema.sql` and the `backend` `db:seed` npm script.
+> If PostgreSQL is installed in another folder, replace the `psql.exe` path
+> with the path on that computer. The PostgreSQL service must be running.
+> `DB_PASSWORD` in `.env` must be the password for the PostgreSQL user, not a
+> BookHaven account password.
 
 The seed script creates test accounts for each role so you can log in right away. The development credentials are listed below. **For development only.**
 
 The backend runs on `http://localhost:3000` and the Vite frontend runs on `http://localhost:5173`.
+
+### Run the application
+
+The application includes buyer cart, checkout, order history, and refund
+requests; seller fulfillment and refund decisions; and administrator order
+and refund oversight.
+
+```powershell
+cd backend
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -d bookhaven -f ".\sql\schema.sql"
+npm run db:seed
+```
+
+Run the API and frontend in separate terminals:
+
+```powershell
+# terminal 1: API
+cd backend
+npm run dev
+
+# terminal 2: frontend
+cd frontend
+npm run dev
+```
+
+Check the API before opening the frontend:
+
+```powershell
+Invoke-WebRequest http://localhost:3000/api/health
+```
+
+The response should contain `"status":"ok"`. Then open
+`http://localhost:5173` in a browser. The frontend calls the API at
+`http://localhost:3000`, so the API must be running first.
+
+Development accounts:
+
+| Role | Email | Password |
+|---|---|---|
+| Buyer | `buyer@bookhaven.test` | `buyer123` |
+| Seller | `seller@bookhaven.test` | `seller123` |
+| Admin | `admin@bookhaven.test` | `admin123` |
+
+Validation commands:
+
+```powershell
+cd backend
+npm run build
+npm test
+npm run test:postman       # requires Newman: npm install -g newman
+npm run test:e2e           # requires Playwright setup
+
+cd ..\frontend
+npm run build
+npm run lint
+```
+
+### Connection troubleshooting
+
+**`psql is not recognized`**
+
+Use the full path:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" --version
+```
+
+Replace `18` if a different PostgreSQL version is installed.
+
+**`password authentication failed for user "postgres"`**
+
+Update `DB_PASSWORD` in `backend\.env` to the password selected when
+PostgreSQL was installed. The value in `.env.example` is only a placeholder.
+
+**`database "bookhaven" does not exist`**
+
+Run the database creation command from the setup section, then apply
+`backend\sql\schema.sql` and run `npm run db:seed` from `backend`.
+
+**`ECONNREFUSED 127.0.0.1:5432`**
+
+Start the PostgreSQL Windows service and retry the schema or seed command.
+PostgreSQL must be listening on port `5432`, unless `DB_PORT` in
+`backend\.env` has been changed.
+
+**The API health check works but login or books fail**
+
+The API is running, but the database connection or seed data is not ready.
+Check `backend\.env`, run `npm run db:seed` from `backend`, and use one of the
+seeded accounts listed below.
+
+Testing and traceability deliverables are in [docs/](./docs/):
+
+- [TestPlan.md](./docs/TestPlan.md)
+- [TestCases.md](./docs/TestCases.md)
+- [RTM.md](./docs/RTM.md) and [RTM.csv](./docs/RTM.csv)
+- [SRS_Update.md](./docs/SRS_Update.md)
 
 ### Seeded development accounts
 
@@ -213,7 +323,7 @@ Planned layout as the codebase is built out:
 
 ```
 Software-Engineering-Project/
-├── SRS_Latex__version_1__1_.pdf   # Full Software Requirements Specification (v1.0)
+├── SRS_Latex__version_1 (1).pdf   # Historical Software Requirements Specification
 ├── frontend/                     # React + Vite web client
 │   └── src/
 ├── backend/                      # Node.js + Express backend
@@ -259,14 +369,16 @@ Every functional requirement in the SRS (REQ-1 through REQ-57) traces back to at
 ## Roadmap
 
 - [x] Sprint 1: Account management, listing management, review/approval workflow
-- [ ] Sprint 2: Search & browse, shopping cart & checkout flow
+- [x] Sprint 2: Search & browse, shopping cart & checkout flow
 - [x] Sprint 3 foundation: PostgreSQL schema, authentication/authorization, 404 page, and data population script
-- [ ] Sprint 4: Payment gateway integration, order fulfillment, returns & refunds
+- [x] Sprint 4 MVP: Order fulfillment, returns/refunds, and admin oversight
+- [ ] Later release: Third-party payment gateway, production deployment, complete digital delivery, and full browser/API automation execution
 - [ ] Production deployment environment selection
 
 ## Documentation
 
-- [`SRS_Latex__version_1__1_.pdf`](./SRS_Latex__version_1__1_.pdf) — full Software Requirements Specification, v1.0, including all functional/nonfunctional requirements and Appendix A user stories
+- [`SRS_Latex__version_1 (1).pdf`](./SRS_Latex__version_1%20(1).pdf) — historical Software Requirements Specification, v1.0
+- [`docs/SRS_Update.md`](./docs/SRS_Update.md) — authoritative Sprint 4 scope revision and deferred requirements
 
 ## License / Course Notice
 

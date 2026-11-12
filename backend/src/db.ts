@@ -11,6 +11,7 @@ export const pool = new Pool({
   database: process.env.DB_NAME || "bookhaven",
   user: process.env.DB_USER || "postgres",
   password: process.env.DB_PASSWORD,
+  allowExitOnIdle: true,
 });
 
 pool.on("error", (error) => {
