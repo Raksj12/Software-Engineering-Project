@@ -5,6 +5,8 @@ function Profile() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [role, setRole] = useState("");
+  const [earnings, setEarnings] = useState<{ grossSales: string; itemsSold: number; orderCount: number } | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Get the user's current information
@@ -38,6 +40,13 @@ function Profile() {
 
         setFullName(data.user.fullName);
         setEmail(data.user.email);
+        setRole(data.user.role);
+        if (data.user.role === "seller") {
+          const earningsResponse = await fetch("http://localhost:3000/api/seller/orders/earnings", {
+            headers: { Authorization: "Bearer " + token },
+          });
+          if (earningsResponse.ok) setEarnings(await earningsResponse.json());
+        }
         setIsLoggedIn(true);
       } catch {
         setMessage("Could not connect to the server.");
@@ -127,6 +136,14 @@ function Profile() {
           <button type="submit">Save Changes</button>
         </form>
       ) : null}
+
+      {role === "seller" && earnings && (
+        <section className="panel form-card">
+          <h3>Seller earnings</h3>
+          <p className="price">${Number(earnings.grossSales).toFixed(2)}</p>
+          <p>{earnings.orderCount} orders · {earnings.itemsSold} items sold</p>
+        </section>
+      )}
 
       <p>{message}</p>
     </div>

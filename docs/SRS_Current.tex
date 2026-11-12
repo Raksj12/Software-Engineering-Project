@@ -1,0 +1,968 @@
+\documentclass[11pt]{scrreprt}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\status}[1]{\textbf{#1}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+
+\title{BookHaven Software Requirements Specification}
+\author{Cindy Cardona-Felix, Rakshit Jaiswal, Jalil Jimenez, Everett Wappler}
+\date{Version 1.4 -- November 11, 2026}
+
+\begin{document}
+\maketitle
+\tableofcontents
+
+\chapter*{Revision History}
+\addcontentsline{toc}{chapter}{Revision History}
+\begin{longtable}{p{1.1cm}p{2.8cm}p{8.8cm}p{2.2cm}}
+\toprule
+\textbf{Version} & \textbf{Date} & \textbf{Change} & \textbf{Status}\\
+\midrule
+1.0 & 2026-09-13 & Original SRS, functional requirements, and user stories. & Baseline\\
+1.1 & 2026-11-08 & Added cart, checkout, order history, refunds, fulfillment, and admin oversight. & Superseded\\
+1.2 & 2026-11-08 & Defined the local development MVP and deferred production integrations. & Superseded\\
+1.3 & 2026-11-11 & Verified checkout and order behavior and documented limitations. & Superseded\\
+1.5 & 2026-11-11 & Removed the out-of-scope delivery feature and deferred requirements; added seller price validation and buyer order editing/returns. & Current\\
+\bottomrule
+\end{longtable}
+
+\chapter{Introduction}
+
+\section{Purpose}
+BookHaven is a web-based marketplace connecting independent booksellers with
+buyers. Sellers create listings and manage inventory. Buyers search, compare,
+purchase, review, and request refunds for books. Administrators moderate
+listings, oversee orders and refunds, and may intervene in marketplace order
+status.
+
+\section{Current Scope}
+The current release is a local PostgreSQL, Express, React, and Vite MVP. It
+supports development payment-format validation but does not connect to a real
+payment provider. The current implementation status is authoritative over
+earlier planned behavior where the two differ.
+
+\section{Definitions}
+\begin{description}[style=nextline]
+\item[Buyer] A registered user who searches for and purchases listings.
+\item[Seller] A registered user who creates listings and fulfills orders.
+\item[Administrator] A platform user with moderation, refund, and order
+intervention privileges.
+\item[Listing] A book offered by a seller, including description, price,
+condition, stock, and cover image metadata.
+\item[Tax state] The two-letter US state used to select the configured base
+state tax rate at checkout.
+\end{description}
+
+\chapter{System Features}
+
+\section{Accounts and Access}
+\begin{itemize}
+\item Buyers and sellers can register, log in, log out, and edit permitted
+profile information.
+\item Server-side role checks protect buyer, seller, and administrator routes.
+\item The current development session token has a fixed lifetime; inactivity
+does not reset its expiration timer.
+\end{itemize}
+
+\section{Listings, Search, and Comparison}
+\begin{itemize}
+\item Sellers can create, edit, and remove their own listings.
+\item ISBN-10 and ISBN-13 checksums are validated.
+\item Administrators approve or reject listings and provide rejection reasons.
+\item Only approved listings appear in buyer search and browse results.
+\item Buyers can search by title, author, genre, or ISBN.
+\item Buyers can compare two to four approved listings. The comparison includes
+title, author, ISBN, genre, description, condition, price, stock, seller,
+listing type, and image metadata.
+\item The comparison API is
+\code{GET /api/listings/compare?ids=<comma-separated-ids>}.
+\end{itemize}
+
+\section{Cart, Quantities, Checkout, and Tax}
+\begin{itemize}
+\item Buyers can add approved, in-stock listings to a cart, remove items, and
+edit whole-number quantities.
+\item Cart and buy-now checkout reject quantities below one or above available
+stock.
+\item Checkout validates the shipping address and development card format.
+Raw card data is not stored.
+\item Stock is locked and decremented transactionally when an order is created.
+\item Buyers select a two-letter US tax state. The configured base state rate
+is applied to the subtotal, rounded to cents, and saved with the order.
+\item Orders persist \code{tax_state}, \code{tax_rate}, \code{tax_amount},
+\code{total_amount}, and the request IP address for audit purposes.
+\item An optional trusted mapping may be configured as
+\code{IP_STATE_MAP=address:STATE,address:STATE}. A matching trusted mapping
+overrides the selected state.
+\end{itemize}
+
+\section{Refunds}
+\begin{itemize}
+\item A buyer may submit a refund request for an eligible order and must provide
+a reason.
+\item Each seller associated with the order receives an in-app notification.
+\item Sellers and administrators may approve or reject refund requests.
+\item Buyers receive an in-app notification after the decision.
+\item The local order and refund status is updated. No external payment refund
+is issued by the current MVP.
+\item A buyer selects either the original payment method or BookHaven store
+credit when requesting a refund.
+\item Approved refunds are automatically marked processed. Store-credit
+refunds increase the buyer's store-credit balance; original-payment refunds
+are recorded as processed locally because no payment gateway is connected.
+\item Processed refunds notify the buyer, associated seller(s), and
+administrators.
+\item Buyers can view their current BookHaven store-credit balance from the
+buyer home and order-history pages.
+\item During cart checkout, buyers may apply available store credit first and
+pay any remaining balance by card. The applied credit and remaining payment
+amount are recorded with the order.
+\end{itemize}
+
+\section{Orders and Returns}
+\begin{itemize}
+\item Buyers can view their own order history and order statuses.
+\item Sellers can view their own order items, process shipments, enter carrier
+and tracking information, and complete or cancel eligible orders.
+\item A buyer may edit the shipping address of a paid order before fulfillment
+unless a return/refund request has been submitted.
+\item A buyer may submit a return/refund request for an eligible order and must
+provide a reason.
+\item Physical return labels, inspection, restocking, and shipment tracking
+are outside the current MVP.
+\end{itemize}
+
+\section{Role Homepages and Seller Earnings}
+\begin{itemize}
+\item \code{/home} routes an authenticated buyer, seller, or administrator to
+the corresponding role dashboard.
+\item Sellers can view gross sales, items sold, and order count in the seller
+dashboard and profile.
+\item Cancelled and refunded orders are excluded from seller gross sales.
+\item The seller workspace uses a focused operations layout with catalog,
+earnings, fulfillment, and customer-care queues rather than buyer storefront
+panels.
+\item Sellers can process pending orders, mark shipments, cancel eligible
+fulfillment items, and approve or deny refund requests from the workspace.
+\end{itemize}
+
+\section{Administrator Intervention}
+\begin{itemize}
+\item Administrators can review listings, oversee refunds, and view platform
+orders.
+\item Administrators can override an order status to paid, processing,
+shipped, delivered, cancelled, or refunded.
+\item Each override creates an \code{admin_actions} audit record and notifies
+the buyer.
+\item Administrators can open one supervision inbox containing buyer order,
+return/refund, order-edit, wishlist, and seller listing/fulfillment activity.
+\item Sellers can open a separate inbox containing buyer return/refund notifications and
+wishlist interest for their listings.
+\item Buyers can open a separate inbox containing order, shipping, return/refund, and
+account notifications, with an unread count in the shared navigation.
+\end{itemize}
+
+\chapter{Requirements Status}
+
+\section{Completed Requirements}
+The following current MVP capabilities are implemented: registration and login;
+role authorization; seller listing ownership; ISBN validation; listing
+moderation; search; listing details; cart operations; quantity validation;
+transactional checkout; state tax calculation and persistence; order history;
+order address editing; return/refund requests and decisions; seller
+notifications; fulfillment; reviews; wishlists; comparison;
+role homepages; seller earnings; administrator order intervention; and
+role-specific supervision inboxes and buyer notifications.
+
+\section{Partial Requirements}
+\begin{longtable}{p{1.2cm}p{5.2cm}p{7.1cm}}
+\toprule
+\textbf{ID} & \textbf{Requirement} & \textbf{Current limitation}\\
+\midrule
+REQ-006 & Profile maintenance & Password changes and the seller store-name workflow are incomplete.\\
+REQ-010 & Re-review edited listings & Full automatic re-review behavior for every materially edited field is incomplete.\\
+REQ-024 & Grouped genre browsing & Genre filtering exists, but a dedicated grouped browse interface is not implemented.\\
+REQ-030 & Itemized pre-payment review & Checkout does not yet provide a separate complete order-summary step before submission.\\
+REQ-035 & Refund expiration & No configurable return/refund eligibility window is enforced.\\
+REQ-043 & Seller cancellation refund & Local refund state is supported, but no real provider refund is issued.\\
+REQ-052 & Review display & Individual reviews are available, but average-rating calculation is incomplete.\\
+REQ-064 & Role inboxes & Admin, seller, and buyer inboxes are implemented with unread navigation badges and read-state updates; browser fixture coverage remains pending.\\
+REQ-066 & Buyer store credit & Buyers can view their current store-credit balance and choose store credit or original payment as the refund destination.\\
+\bottomrule
+\end{longtable}
+
+\section{Deferred Requirements}
+\begin{itemize}
+\item Real payment gateway integration and provider-based refunds.
+\item Automatic public-IP geolocation. The application stores IP audit data and
+supports trusted static mappings, but does not send IP addresses to an
+external geolocation service.
+\item County, city, district, exemption, and tax-jurisdiction calculations.
+The current tax feature uses configured base state rates and buyer-selected
+state, with trusted static IP mapping as an optional override.
+\item Production hosting, email provider, HTTPS deployment, and mobile
+applications.
+\item Full browser E2E and Newman assertion coverage.
+\end{itemize}
+
+\chapter{User Stories}
+
+\section{Purpose and Interpretation}
+This chapter records the stakeholder-facing user stories that define the
+BookHaven MVP. Each story identifies the actor's goal, preconditions, normal
+flow, alternate flows, and acceptance criteria. A story may describe behavior
+that is planned but not fully implemented; its implementation status is defined
+in Chapter 4. In particular, payment-provider processing, public-IP
+geolocation and return-expiration enforcement are explicitly partial or
+deferred rather than silently assumed to be complete.
+
+\section{Buyer User Stories}
+
+\subsection{User Story 1 --- Register and log in}
+\textbf{As a visitor,} I want to create a Buyer or Seller account and log in
+so that I can use the marketplace features assigned to my role.
+
+\textit{Preconditions:}
+\begin{itemize}
+\item The visitor is not already authenticated.
+\item The submitted email address is not already registered.
+\end{itemize}
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The visitor opens the registration page.
+\item The visitor enters a name, email address, password, and account role.
+\item The system validates required fields and password format.
+\item The system rejects duplicate email addresses.
+\item The system hashes the password and creates the account.
+\item The visitor logs in with the new credentials.
+\item The system issues a development session token and redirects by role.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item If a required field is missing, the system identifies the field and does
+not create the account.
+\item If the email already exists, the system returns a generic registration
+error and does not overwrite the existing account.
+\item If the password is incorrect at login, the system returns a generic
+invalid-login message without revealing whether the email or password failed.
+\end{itemize}
+
+\textit{Acceptance criteria:}
+\begin{itemize}
+\item A valid Buyer and a valid Seller can register independently.
+\item Passwords are never stored in plaintext.
+\item Invalid credentials do not expose sensitive account information.
+\item A user cannot select or obtain administrator privileges during
+registration.
+\end{itemize}
+
+\subsection{User Story 2 --- Maintain a profile}
+\textbf{As an authenticated user,} I want to edit permitted account
+information so that my profile remains accurate.
+
+\textit{Preconditions:} The user is logged in and owns the profile being edited.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The user opens Profile.
+\item The system displays editable account fields.
+\item The user changes permitted information such as name or email.
+\item The system validates the values and checks email uniqueness.
+\item The system saves the changes and displays confirmation.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item An email already assigned to another account is rejected.
+\item Account type is not displayed as an editable field.
+\item Password-change and store-name workflows are retained as future profile
+enhancements where they are not available in the current MVP.
+\end{itemize}
+
+\subsection{User Story 3 --- Use the role homepage}
+\textbf{As an authenticated user,} I want a homepage that returns me to the
+features for my role so that I can quickly resume marketplace work.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The user opens \code{/home}.
+\item The system reads the authenticated role.
+\item Buyers are routed to the Buyer dashboard, Sellers to the Seller
+dashboard, and Administrators to the Administrator dashboard.
+\item The dashboard provides navigation to the role's available features.
+\item The seller dashboard opens a focused seller workspace with catalog,
+earnings, fulfillment, and customer-care tools.
+\item The administrator dashboard opens a distinct administrative control
+center rather than the buyer storefront.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item An unauthenticated visitor is routed to login.
+\item A user attempts to open a dashboard for another role; server-side
+authorization rejects the request.
+\end{itemize}
+
+\subsection{User Story 4 --- Search and browse books}
+\textbf{As a buyer,} I want to search and browse approved books by title,
+author, genre, or ISBN so that I can find items to purchase.
+
+\textit{Preconditions:} Approved listings exist or the system can display a
+no-results state.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer enters a search term or selects a genre.
+\item The system searches only approved listings.
+\item The system sorts matching results alphabetically by title.
+\item The buyer views title, author, genre, condition, price, stock, seller,
+and image information.
+\item The buyer opens a listing for its complete description and details.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item A search with no matches displays a clear ``No results found'' message.
+\item Unapproved, rejected, or removed listings are excluded.
+\item A dedicated grouped genre-browse interface remains a partial enhancement;
+genre filtering is available.
+\end{itemize}
+
+\subsection{User Story 5 --- Compare marketplace listings}
+\textbf{As a buyer,} I want to compare two to four approved listings so that I
+can choose the best item from different sellers or conditions.
+
+\textit{Preconditions:}
+\begin{itemize}
+\item At least two approved listings are available.
+\item The buyer has selected no more than four distinct listing identifiers.
+\end{itemize}
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer selects comparison checkboxes in the catalog.
+\item The buyer chooses Compare.
+\item The system validates that two to four valid listings were selected.
+\item The system retrieves the approved listings.
+\item The comparison page displays title, author, ISBN, description, genre,
+condition, price, stock, seller, image, and listing type in a consistent table.
+\item The buyer returns to the catalog or opens a selected listing.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item Fewer than two valid items produces a validation message.
+\item More than four selections are limited to the supported comparison size.
+\item An unapproved or missing listing is not presented as an approved
+comparison result.
+\end{itemize}
+
+\textit{Acceptance criteria:} The endpoint
+\code{GET /api/listings/compare?ids=<ids>} and the Buyer comparison page use
+the same approved-listing rules and expose the description as well as the
+commercial comparison fields.
+
+\subsection{User Story 6 --- Add and remove cart items}
+\textbf{As a buyer,} I want to add and remove books from my cart so that I can
+adjust my intended purchase before checkout.
+
+\textit{Preconditions:} The buyer is authenticated and the listing is approved
+and in stock.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer selects Add to Cart on an approved listing.
+\item The system creates or updates the buyer's cart item.
+\item The cart displays the item, unit price, quantity, and subtotal.
+\item The buyer removes an item when it is no longer wanted.
+\item The system recalculates the subtotal and cart contents.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item An unauthenticated buyer is asked to log in.
+\item A zero-stock listing cannot be added.
+\item Removing the last item displays an empty-cart message and prevents
+checkout until another item is added.
+\end{itemize}
+
+\subsection{User Story 7 --- Select item quantities}
+\textbf{As a buyer,} I want to select how many copies of an item I want so
+that I can purchase multiple available copies without exceeding stock.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer enters a whole-number quantity in the cart or Buy Now form.
+\item The system validates that the quantity is at least one.
+\item The system compares the requested quantity with current stock.
+\item The system updates the cart quantity or proceeds to checkout.
+\item The system multiplies unit price by quantity when calculating subtotal.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item Decimal, zero, negative, or non-numeric quantities are rejected.
+\item A quantity greater than stock returns an error and leaves the prior
+quantity unchanged.
+\item If stock changes before checkout, the transactional checkout rejects the
+order rather than creating an oversold order.
+\end{itemize}
+
+\subsection{User Story 8 --- Review an order before checkout}
+\textbf{As a buyer,} I want to review my selected items, quantities, prices,
+shipping address, tax, and total before submitting checkout so that I can
+correct mistakes.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The authenticated buyer opens checkout with a non-empty cart.
+\item The system displays the cart items and quantities.
+\item The buyer enters a shipping address and selects a tax state.
+\item The system displays the subtotal, configured tax rate, tax amount, and
+calculated total.
+\item The buyer can apply available BookHaven store credit and sees the
+credit applied and remaining amount due by card.
+\item The checkout summary lists each item, quantity, unit price, line total,
+subtotal, tax state, tax rate, tax amount, store credit applied, and amount
+due before submission.
+\item The buyer enters development card-format information.
+\item The buyer submits the order.
+\end{enumerate}
+
+\textit{Status note:} The checkout provides a persistent itemized order summary
+with subtotal, state tax, store credit applied, and remaining amount due before
+submission.
+
+\subsection{User Story 9 --- Calculate state tax}
+\textbf{As a buyer,} I want the checkout tax to reflect my selected state so
+that the amount recorded for the order is understandable.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer selects a valid two-letter US state.
+\item The system selects the configured base rate for that state.
+\item The system calculates tax from the subtotal and rounds the amount to cents.
+\item The system displays the tax and includes it in the final total.
+\item The system saves tax state, rate, amount, total, and request IP audit data
+with the order.
+\end{enumerate}
+
+\textit{Location and privacy rules:}
+\begin{itemize}
+\item A trusted deployment may define \code{IP_STATE_MAP} entries for known
+addresses; a matching entry overrides the selected state.
+\item The system does not claim that an IP address proves a buyer's location.
+\item Automatic public-IP geolocation and local tax-jurisdiction lookup are
+deferred. City, county, district, exemption, and tax-holiday rules are not
+included in the base MVP calculation.
+\end{itemize}
+
+\subsection{User Story 10 --- Complete checkout}
+\textbf{As a buyer,} I want a successful checkout to create my order and
+reserve stock so that my purchase is recorded.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer submits valid checkout information.
+\item The system begins a database transaction and locks the relevant stock
+updates.
+\item The system verifies that every item is approved and available.
+\item The system decrements stock and creates the order and order items.
+\item The system clears the cart after commit and shows confirmation.
+\item The system sends an in-app new-order notification to the seller.
+\item The order records the total amount, store-credit amount applied, and
+remaining payment amount.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item Invalid card format, address, state, quantity, or product data is
+rejected before order creation.
+\item A stock conflict rolls back the transaction and leaves the order
+uncreated.
+\item A database failure rolls back stock and order changes.
+\item A real payment-provider decline cannot currently be simulated because a
+provider is deferred.
+\end{itemize}
+
+\subsection{User Story 11 --- View order history}
+\textbf{As a buyer,} I want to view my own orders and statuses so that I can
+track purchases and use eligible post-purchase actions.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer opens Order History.
+\item The system authenticates the buyer.
+\item The system queries only orders owned by that buyer.
+\item The system displays order status, total, date, items, quantities, unit
+prices, and fulfillment status.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item A missing or invalid token returns Unauthorized.
+\item A buyer with no orders receives an empty history rather than another
+buyer's order data.
+\end{itemize}
+
+\subsection{User Story 12 --- Request a refund}
+\textbf{As a buyer,} I want to request a refund with a reason so that a seller
+or administrator can review a problem with my order.
+
+\textit{Preconditions:} The buyer owns the order and the order is in an
+eligible local status.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer selects Request Refund from Order History.
+\item The buyer enters a reason.
+\item The buyer selects either the original payment method or BookHaven store
+credit as the refund destination.
+\item The buyer can view their current BookHaven store-credit balance from the
+buyer dashboard and Order History.
+\item The system validates the order identifier, buyer ownership, eligibility,
+non-empty reason, and refund destination.
+\item The system creates a refund request and marks the local order refund
+status as requested.
+\item The system notifies every seller associated with the order.
+\item The buyer receives a request confirmation.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item Missing reason returns a validation error.
+\item A nonexistent order returns Not Found.
+\item An order belonging to another buyer cannot be used.
+\item A duplicate or ineligible request is rejected.
+\item A configurable time-based return window is a deferred enhancement.
+\end{itemize}
+
+\subsection{User Story 13 --- Receive a refund decision}
+\textbf{As a buyer,} I want to know whether my refund request was approved or
+rejected so that I understand the final marketplace decision.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item A seller or administrator reviews the request.
+\item The reviewer approves or rejects the request.
+\item The system updates the refund request and local order status.
+\item The system records the reviewer and decision time where applicable.
+\item The system sends an in-app notification to the buyer.
+\item The buyer sees the decision in Order History.
+\item If store credit was selected and approved, the updated balance is
+available for a future checkout.
+\item When store credit was selected, the buyer can see the updated balance in
+the buyer area.
+\end{enumerate}
+
+\textit{Status note:} The current implementation updates local state only; it
+does not send money through a payment provider.
+
+\subsection{User Story 14 --- Write a review}
+\textbf{As a buyer,} I want to rate and review a delivered book so that I can
+share my experience with other buyers.
+
+\textit{Preconditions:} The buyer owns a delivered order containing the book
+and has not already reviewed it.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer opens the delivered order or product review form.
+\item The buyer selects a rating from one through five stars.
+\item The buyer enters review text.
+\item The system checks authentication, purchase, delivery, duplicate status,
+rating range, and prohibited content.
+\item The system stores the valid review.
+\item The product page displays the review.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item A buyer without a delivered purchase is rejected.
+\item A duplicate review is rejected.
+\item A missing or out-of-range rating is rejected.
+\item Prohibited content is rejected with an explanation.
+\item Average-rating calculation remains a partial enhancement.
+\end{itemize}
+
+\subsection{User Story 15 --- Manage a wishlist}
+\textbf{As a buyer,} I want to save and remove books from a wishlist so that I
+can find items later without placing them in my cart.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The buyer selects Add to Wishlist for a listing.
+\item The system saves the buyer-listing relationship.
+\item The buyer opens the wishlist and sees all saved items.
+\item The buyer removes an item when desired.
+\item The system confirms the updated wishlist.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item Duplicate additions are rejected with feedback.
+\item Unavailable listings remain visible and are marked unavailable.
+\item The buyer can remove an unavailable listing.
+\end{itemize}
+
+\section{Seller User Stories}
+
+\subsection{User Story 16 --- Create a physical listing}
+\textbf{As a seller,} I want to list a physical book with complete information
+so that buyers can discover and purchase it.
+
+\textit{Preconditions:} The seller is authenticated and owns the information
+and image being submitted.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The seller opens My Listings and selects Add New Listing.
+\item The seller chooses Physical and enters title, author, ISBN, genre,
+condition, description, price, and stock.
+\item The seller optionally uploads a supported cover image.
+\item The system validates required fields, ISBN checksum, price, and stock.
+\item The system creates the listing in pending review.
+\item An administrator receives the listing in the moderation queue.
+\item The seller can later see the listing's moderation status and any
+rejection reason in the seller workspace.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item Missing fields, invalid ISBN, invalid price, or invalid stock prevent
+submission.
+\item An unsupported or oversized image is rejected.
+\item A seller cannot create a listing on behalf of another seller.
+\end{itemize}
+
+\subsection{User Story 17 --- Edit and remove a listing}
+\textbf{As a seller,} I want to edit or remove my own listing so that inventory
+and product information remain current.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The seller opens one of their listings.
+\item The seller changes permitted fields or chooses Remove.
+\item The system verifies seller ownership.
+\item The system validates changes and persists them.
+\item The system hides a removed listing from buyers.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item A seller cannot edit or remove another seller's listing.
+\item A materially changed listing should return to moderation; complete
+automatic re-review coverage remains partial.
+\end{itemize}
+
+\subsection{User Story 20 --- View seller orders}
+\textbf{As a seller,} I want to view orders containing my listings so that I
+can fulfill only the items I sold.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The seller opens Pending Orders.
+\item The system returns order items associated with that seller.
+\item The seller sees order identifier, title, quantity, fulfillment status,
+buyer shipping information permitted for fulfillment, and order information.
+\item The seller selects an order item for processing.
+\item The seller uses a focused fulfillment queue to process, ship, or cancel
+eligible order items without buyer storefront panels.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item A seller cannot view unrelated sellers' order items.
+\item An unauthenticated or non-seller request is rejected.
+\end{itemize}
+
+\subsection{User Story 21 --- Fulfill and ship a physical order}
+\textbf{As a seller,} I want to process and ship a physical order with tracking
+so that the buyer can follow delivery.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The seller marks an eligible item as Processing.
+\item The seller enters a carrier and tracking number.
+\item The system changes the fulfillment status to Shipped.
+\item The system records the tracking data.
+\item The system notifies the buyer.
+\item The seller later marks the item Delivered when appropriate.
+\item The seller workspace shows fulfillment counts and pending operational
+work at a glance.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item Invalid transitions are rejected.
+\item Missing tracking data is rejected when shipping requires it.
+\item A seller cannot fulfill an item not associated with their account.
+\end{itemize}
+
+\subsection{User Story 22 --- Cancel an unshipped order}
+\textbf{As a seller,} I want to cancel an order I cannot fulfill so that the
+buyer is informed and the local order state is corrected.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The seller selects Cancel on an eligible unshipped order.
+\item The seller enters a cancellation reason.
+\item The system changes the local status to cancelled.
+\item The system records the local refund state where applicable.
+\item The buyer receives the cancellation reason.
+\end{enumerate}
+
+\textit{Status note:} A real payment refund to the original payment method is
+deferred because no payment provider is connected.
+
+\subsection{User Story 23 --- Review seller earnings}
+\textbf{As a seller,} I want to see gross sales, items sold, order count, and
+order information in my dashboard and profile so that I can track earnings.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The seller opens the Seller dashboard or Profile.
+\item The system requests the seller's earnings summary.
+\item The system aggregates eligible order items for that seller.
+\item The system displays gross sales, items sold, and order count.
+\item The seller reviews order prices and quantities through the seller order
+list.
+\item The seller can review a per-listing earnings breakdown in addition to
+the summary metrics.
+\end{enumerate}
+
+\textit{Acceptance criteria:}
+\begin{itemize}
+\item Earnings are scoped to the authenticated seller.
+\item Cancelled and refunded orders are excluded from gross sales.
+\item A seller cannot request another seller's earnings.
+\end{itemize}
+
+\subsection{User Story 24 --- Receive refund-request notices}
+\textbf{As a seller,} I want to receive a notification when a buyer requests
+a refund for one of my items so that I can review the request.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item A buyer submits a valid refund request.
+\item The system identifies every seller represented in the order.
+\item The system creates an in-app notification for each relevant seller.
+\item The seller opens the refund queue and reviews the reason.
+\item The seller approves or rejects the request.
+\item The seller sees the requested refund destination and amount before
+making a decision.
+\end{enumerate}
+
+\section{Administrator User Stories}
+
+\subsection{User Story 25 --- Moderate listings}
+\textbf{As an administrator,} I want to approve or reject pending listings so
+that only appropriate and accurate listings become visible.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The administrator opens the pending listing queue.
+\item The system orders pending entries by submission date.
+\item The administrator reviews listing fields, ISBN, and prohibited-content
+flags.
+\item The administrator approves a valid listing or rejects it with a reason.
+\item The system changes visibility and notifies the seller.
+\item The control center displays the number of open listing decisions and
+keeps moderation actions separate from buyer browsing and ordering.
+\end{enumerate}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item An invalid ISBN prevents approval.
+\item Prohibited content causes a moderation warning or rejection.
+\item A non-administrator cannot access moderation actions.
+\end{itemize}
+
+\subsection{User Story 26 --- Manage prohibited words}
+\textbf{As an administrator,} I want to maintain prohibited words and phrases
+so that listings and reviews can be screened consistently.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The administrator opens prohibited-content management.
+\item The administrator adds, edits, or removes a word or phrase.
+\item The system validates and saves the moderation rule.
+\item Future listing and review submissions use the maintained rule set.
+\item The administrator can run a scan of pending listings against the
+current safety rules.
+\end{enumerate}
+
+\subsection{User Story 27 --- Oversee refunds}
+\textbf{As an administrator,} I want to review all refund requests and decide
+disputed requests so that I can intervene between buyers and sellers.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The administrator opens the platform refund queue.
+\item The system displays buyer, order, reason, seller, and refund status.
+\item The administrator approves or rejects the request.
+\item The system updates local refund and order status.
+\item The system notifies the buyer and records the administrative action.
+\item The control center displays open refund decisions and identifies the
+selected destination as original payment or store credit.
+\end{enumerate}
+
+\subsection{User Story 28 --- Override order status}
+\textbf{As an administrator,} I want to override an eligible order status so
+that I can resolve operational problems between a buyer and seller.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The administrator opens platform order oversight.
+\item The administrator selects an order and an allowed status:
+\code{paid}, \code{processing}, \code{shipped}, \code{delivered},
+\code{cancelled}, or \code{refunded}.
+\item The system validates the administrator role and order identifier.
+\item The system updates the order.
+\item The system creates an \code{admin_actions} audit record.
+\item The system sends an in-app notification to the buyer.
+\end{enumerate}
+
+\subsection{User Story 31 --- Govern marketplace accounts}
+\textbf{As an administrator,} I want to approve or disable marketplace
+accounts so that only permitted buyers and sellers can operate.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The administrator opens the account approval queue in the control center.
+\item The system displays pending account name, email, and role information.
+\item The administrator approves or disables an account.
+\item The system updates the account status and records the administrative
+action.
+\end{enumerate}
+
+\subsection{User Story 30 --- Operate a dedicated control center}
+\textbf{As an administrator,} I want a focused operational dashboard so that
+moderation and marketplace supervision are not mixed with buyer storefront
+features.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The administrator opens the Admin Control Center.
+\item The system displays queue metrics for listings, refunds, account
+approvals, and safety rules.
+\item The administrator uses dedicated moderation, refund, account, and
+safety command panels.
+\item The administrator uses one supervision inbox for operational
+notifications.
+\end{enumerate}
+
+\textit{Acceptance criteria:}
+\begin{itemize}
+\item The admin navigation does not present buyer Browse, Cart, or Orders
+links as the primary admin workspace.
+\item Admin actions remain protected by administrator authorization.
+\item The control center provides a clear empty state when a queue has no
+pending work.
+\end{itemize}
+
+\textit{Alternate flows:}
+\begin{itemize}
+\item An invalid status or order identifier is rejected.
+\item A buyer, seller, or anonymous caller cannot use the administrator
+endpoint.
+\item The administrator cannot claim that a real payment was refunded when the
+payment-provider integration is deferred; the local status must be understood
+as a marketplace record.
+\end{itemize}
+
+\subsection{Administrator control center}
+\textbf{The administrator dashboard is a dedicated operational control
+center, not a buyer storefront.}
+\begin{itemize}
+\item The admin control center shows queue metrics for listing moderation,
+refund decisions, account approvals, and active safety rules.
+\item Administrators can approve or disable pending buyer and seller accounts.
+\item Administrators can process or deny refunds without opening buyer-style
+order, cart, or browse pages.
+\item Administrators can add or remove prohibited-content rules and run a
+pending-listing safety scan.
+\item The admin navigation exposes control-center and supervision tools rather
+than buyer storefront navigation.
+\end{itemize}
+
+\subsection{User Story 29 --- Review platform earnings}
+\textbf{As an administrator,} I want to review platform-wide order and earning
+aggregates so that I can monitor marketplace activity.
+
+\textit{Main flow:}
+\begin{enumerate}
+\item The administrator opens the administrative dashboard.
+\item The system aggregates eligible order totals and counts.
+\item The system excludes cancelled and refunded orders from gross-sales
+aggregates where configured.
+\item The administrator reviews the summary without seeing raw payment-card
+data.
+\end{enumerate}
+
+\section{Cross-Cutting Acceptance Criteria}
+\begin{itemize}
+\item Every protected story requires authentication and server-side role
+authorization; hiding a frontend link alone is insufficient.
+\item Buyer data, orders, cart items, and refunds are
+scoped to the authenticated owner or authorized role.
+\item Listing and order state changes return explicit errors for invalid input
+instead of silently succeeding.
+\item Stock updates used by checkout are transactional and cannot create an
+order when the requested quantity is unavailable.
+\item Tax totals are calculated from the persisted subtotal and configured
+state rate; the request IP is audit metadata, not a guaranteed location
+source.
+\item Refund and administrator actions notify affected users through the
+existing in-app notification mechanism.
+\item The buyer cart badge displays total item quantity and refreshes after
+cart, login, and logout changes.
+\item Seller earnings include gross sales, item count, order count, and a
+per-listing breakdown; cancelled and refunded orders are excluded from gross
+sales.
+\item The buyer return action represents the implemented local refund-request
+workflow. Physical return labels, inspection, restocking, and shipment
+tracking remain deferred.
+\item The requirements traceability matrix in \code{docs/RTM.csv} maps the
+original requirements and added requirements REQ-058 through REQ-063 to their
+implementation and test cases.
+\end{itemize}
+
+\chapter{Verification}
+\begin{itemize}
+\item Backend TypeScript build: passed.
+\item Frontend production build: passed.
+\item Frontend lint: passed.
+\item Backend tests: 23 passed, 0 failed against the isolated PostgreSQL test
+database.
+\item The global cart badge, seller earnings breakdown endpoint, seller price
+validation, and buyer order edit/return flow passed frontend lint/build and
+backend build validation.
+\item Admin and seller role-specific inboxes are wired to notifications and
+wishlist-interest data.
+\item New feature test cases TC-024 through TC-031 are documented in
+\code{docs/TestCases.md}; dedicated seeded integration fixtures remain follow-up
+coverage.
+\end{itemize}
+
+\chapter{Traceability Notes}
+The detailed requirement traceability matrix is maintained in
+\code{docs/RTM.csv}. Requirements REQ-058 through REQ-063 cover comparison,
+quantity controls, state tax, role homepages, seller earnings, administrator
+order intervention, seller price validation, and buyer order editing/returns.
+Return support is tracked as partial because the current implementation is a
+local refund-request workflow rather than a physical return logistics workflow.
+
+\end{document}

@@ -2,6 +2,7 @@ import { Router } from "express";
 import { pool } from "./db.js";
 import { isValidIsbn } from "./isbn.js";
 import { detectImageType, saveImage, uploadImage } from "./images.js";
+import { notifyAdmins } from "./notifications.js";
 
 export const sellerListingsRouter = Router();
 
@@ -11,6 +12,12 @@ const LISTING_COLUMNS = `id, title, author, isbn, genre, condition, description,
   image_path AS "imagePath", status, rejection_reason AS "rejectionReason", created_at AS "createdAt"`;
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+const parsePrice = (value: unknown): number | null => {
+  const raw = text(String(value ?? ""));
+  if (!/^\d+(\.\d{1,2})?$/.test(raw)) return null;
+  const price = Number(raw);
+  return Number.isFinite(price) && price > 0 ? price : null;
+};
 
 // The logged-in seller's own listings, in every review state
 sellerListingsRouter.get("/", async (req, res) => {
@@ -27,10 +34,10 @@ sellerListingsRouter.patch("/:id", async (req, res) => {
   const body = req.body ?? {};
   const title = text(body.title), author = text(body.author), genre = text(body.genre), description = text(body.description);
   const condition = text(body.condition).toLowerCase();
-  const price = Number(body.price), stock = Number(body.stock);
+  const price = parsePrice(body.price), stock = Number(body.stock);
   if (!title || !author || !genre || !description || !CONDITIONS.includes(condition) ||
-      !Number.isFinite(price) || price < 0 || !Number.isInteger(stock) || stock < 0) {
-    res.status(400).json({ error: "Valid title, author, genre, description, condition, price, and stock are required." }); return;
+      price === null || !Number.isInteger(stock) || stock < 0) {
+    res.status(400).json({ error: "Enter a valid price greater than 0 with no more than two decimal places (for example, 12.99)." }); return;
   }
   const result = await pool.query(
     `UPDATE products SET title=$1, author=$2, genre=$3, description=$4, condition=$5, price=$6, stock=$7,
@@ -60,7 +67,7 @@ sellerListingsRouter.post("/", uploadImage, async (req, res) => {
   const genre = text(body.genre);
   const condition = text(body.condition).toLowerCase();
   const description = text(body.description);
-  const price = text(String(body.price ?? "")) === "" ? NaN : Number(body.price);
+  const price = parsePrice(body.price);
   const stock = text(String(body.stock ?? "")) === "" ? NaN : Number(body.stock);
 
   if (!title || !author || !genre || !description) {
@@ -75,8 +82,8 @@ sellerListingsRouter.post("/", uploadImage, async (req, res) => {
     res.status(400).json({ error: "Condition must be new or used." });
     return;
   }
-  if (!Number.isFinite(price) || price < 0) {
-    res.status(400).json({ error: "Price must be a number of 0 or more." });
+  if (price === null) {
+    res.status(400).json({ error: "Enter a valid price greater than 0 with no more than two decimal places (for example, 12.99)." });
     return;
   }
   if (!Number.isInteger(stock) || stock < 0) {
@@ -102,6 +109,7 @@ sellerListingsRouter.post("/", uploadImage, async (req, res) => {
       [req.user!.id, title, author, isbn, genre, condition, description, price, stock, imagePath],
     );
     await client.query("COMMIT");
+    await notifyAdmins(`Seller #${req.user!.id} submitted listing "${title}" for moderation.`);
     res.status(201).json({ listing: result.rows[0], message: "Listing submitted for admin review." });
   } catch (error) {
     await client.query("ROLLBACK");

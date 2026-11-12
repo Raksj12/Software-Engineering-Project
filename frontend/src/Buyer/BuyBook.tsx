@@ -35,6 +35,7 @@ function BuyBook() {
   const [book, setBook] = useState<Book | null>(null);
   const [quantity, setQuantity] = useState("1");
   const [shippingAddress, setShippingAddress] = useState("");
+  const [taxState, setTaxState] = useState("CA");
   const [cardName, setCardName] = useState("");
   const [cardNumber, setCardNumber] = useState("");
   const [expiry, setExpiry] = useState("");
@@ -72,6 +73,7 @@ function BuyBook() {
           productId: id,
           quantity,
           shippingAddress,
+          taxState,
           card: { name: cardName, number: cardNumber, expiry, cvv },
         }),
       });
@@ -150,6 +152,9 @@ function BuyBook() {
               onChange={(event) => setShippingAddress(event.target.value)}
               required
             />
+            <select value={taxState} onChange={(event) => setTaxState(event.target.value)} required>
+              {["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"].map((state) => <option key={state} value={state}>{state}</option>)}
+            </select>
 
             <h3>Payment</h3>
 

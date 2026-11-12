@@ -10,7 +10,6 @@ The available repository SRS defines REQ-1 through REQ-57. The Lab Topic PDF ref
 | REQ-004 | Credentials must not leak detail | The system shall return a generic invalid-login error. | Completed | TC-002 | backend/src/index.ts | SRS 3.1 |
 | REQ-005 | Users need logout | The system shall allow logged-in users to log out. | Completed | TC-001 | backend/src/index.ts, frontend/src/Account/Login.tsx | SRS 3.1 |
 | REQ-006 | Users need profile maintenance | The system shall allow users to edit permitted account information. | Completed | TC-015 | backend/src/index.ts, frontend/src/Account/Profile.tsx | Password/store-name workflow deferred; permitted profile fields are supported |
-| REQ-007 | Sessions must expire | The system shall end inactive sessions after 30 minutes. | Deferred | TC-015 | backend/src/auth.ts | Fixed-lifetime development token is used; inactivity reset is out of MVP scope |
 | REQ-008 | Sellers need listings | The system shall allow sellers to create complete listings with optional images. | Completed | TC-004 | backend/src/sellerListings.ts, frontend/src/Seller/SellerHome.tsx | SRS 3.2 |
 | REQ-009 | ISBN must be valid | The system shall validate ISBN-10 and ISBN-13 checksums. | Completed | TC-003 | backend/src/isbn.ts | SRS 3.2 |
 | REQ-010 | Listings require moderation | The system shall place new/materially edited listings into pending review. | In Progress | TC-004 | backend/src/sellerListings.ts | Edit review behavior incomplete |
@@ -34,9 +33,7 @@ The available repository SRS defines REQ-1 through REQ-57. The Lab Topic PDF ref
 | REQ-028 | Cart totals must update | The system shall allow cart view/removal and subtotal updates. | Completed | TC-006 | backend/src/cart.ts, frontend/src/Buyer/Cart.tsx | SRS 3.5 |
 | REQ-029 | Checkout requires authentication | The system shall require login before checkout. | Completed | TC-007 | backend/src/index.ts, frontend/src/App.tsx | SRS 3.5 |
 | REQ-030 | Buyers need order review | The system shall display an itemized order summary before payment. | In Progress | TC-007 | frontend/src/Buyer/Checkout.tsx | Summary UI should be expanded |
-| REQ-031 | Card data must be protected | The system shall use payment processing without storing raw card data. | In Progress | TC-007 | backend/src/orders.ts | Development payment stub |
 | REQ-032 | Successful payment creates order | The system shall decrement stock and create a permanent order. | Completed | TC-007 | backend/src/orders.ts | SRS 3.5 |
-| REQ-033 | Failed payment must rollback | The system shall leave stock/orders unchanged after failed payment. | In Progress | TC-008 | backend/src/orders.ts | Gateway failure simulation incomplete |
 | REQ-034 | Buyers need returns | The system shall allow eligible return requests. | Completed | TC-009 | backend/src/orders.ts | Configurable window needs extraction |
 | REQ-035 | Expired returns must fail | The system shall reject expired return requests. | In Progress | TC-009 | backend/src/orders.ts | Date-window enforcement incomplete |
 | REQ-036 | Refunds need reasons | The system shall require a refund reason. | Completed | TC-009 | backend/src/orders.ts | SRS 3.6 |
@@ -48,8 +45,6 @@ The available repository SRS defines REQ-1 through REQ-57. The Lab Topic PDF ref
 | REQ-042 | Buyers need tracking notices | The system shall notify buyers when orders ship. | Completed | TC-011 | backend/src/fulfillmentRoutes.ts | SRS 3.7 |
 | REQ-043 | Sellers need cancellation/refunds | The system shall allow unshipped cancellation and refund. | In Progress | TC-011 | backend/src/fulfillmentRoutes.ts | Payment refund stub |
 | REQ-044 | Cancellations need notices | The system shall notify buyers of cancellation reasons. | Completed | TC-011 | backend/src/fulfillmentRoutes.ts | SRS 3.7 |
-| REQ-045 | Digital products need auto-delivery | The system shall generate and deliver digital access tokens. | Deferred | TC-016 | Not implemented | Complete digital-product delivery is out of MVP scope |
-| REQ-046 | Digital sellers need notices | The system shall notify sellers of digital fulfillment. | Deferred | TC-016 | Not implemented | Complete digital-product delivery is out of MVP scope |
 | REQ-047 | Reviews require delivery | The system shall allow reviews only for delivered purchases. | Completed | TC-012 | backend/src/reviews.ts | SRS 3.8 |
 | REQ-048 | One review per product | The system shall prevent duplicate reviews. | Completed | TC-012 | backend/sql/schema.sql, backend/src/reviews.ts | SRS 3.8 |
 | REQ-049 | Reviews need moderation | The system shall screen reviews for prohibited content. | Completed | TC-012 | backend/src/reviews.ts | SRS 3.8 |

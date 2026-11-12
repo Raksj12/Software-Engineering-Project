@@ -29,6 +29,7 @@
     "@types/multer": "^2.3.0",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "newman": "^6.2.3",
     "tsx": "^4.23.15",
     "txt": "^1.0.0",
     "typescript": "^7.0.2"

@@ -1,6 +1,7 @@
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { pool } from "./db.js";
 import { parseToken } from "./auth.js";
+import { notifyAdmins } from "./notifications.js";
 
 const router = Router();
 
@@ -81,6 +82,17 @@ router.post("/", async (req, res, next) => {
       return;
     }
 
+    const seller = await pool.query(
+      "SELECT seller_id FROM products WHERE id=$1",
+      [productId],
+    );
+    if (seller.rowCount) {
+      await pool.query(
+        "INSERT INTO notifications (user_id, message) VALUES ($1, $2)",
+        [seller.rows[0].seller_id, `A buyer added your book #${productId} to a wishlist.`],
+      );
+    }
+    await notifyAdmins(`Buyer #${req.user!.id} added book #${productId} to a wishlist.`);
     res.status(201).json({ message: "Book added to wishlist." });
   } catch (error) {
     next(error);

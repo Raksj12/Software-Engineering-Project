@@ -9,6 +9,8 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ALTER TABLE users ADD COLUMN IF NOT EXISTS store_name TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS store_credit NUMERIC(10, 2) NOT NULL DEFAULT 0
+  CHECK (store_credit >= 0);
 
 CREATE TABLE IF NOT EXISTS products (
   id BIGSERIAL PRIMARY KEY,
@@ -26,9 +28,8 @@ CREATE TABLE IF NOT EXISTS products (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-ALTER TABLE products ADD COLUMN IF NOT EXISTS listing_type TEXT NOT NULL DEFAULT 'physical'
-  CHECK (listing_type IN ('physical', 'digital'));
-ALTER TABLE products ADD COLUMN IF NOT EXISTS digital_url TEXT;
+ALTER TABLE products DROP COLUMN IF EXISTS listing_type;
+ALTER TABLE products DROP COLUMN IF EXISTS digital_url;
 
 CREATE TABLE IF NOT EXISTS wishlists (
   buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -78,11 +79,22 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+ALTER TABLE orders ADD CONSTRAINT orders_status_check
+  CHECK (status IN ('pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'));
 
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_status TEXT NOT NULL DEFAULT 'none'
   CHECK (refund_status IN ('none', 'requested', 'approved', 'rejected', 'completed'));
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS refund_reason TEXT;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_state TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_rate NUMERIC(6, 5) NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS tax_amount NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (tax_amount >= 0);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS ip_address INET;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS store_credit_applied NUMERIC(10, 2) NOT NULL DEFAULT 0
+  CHECK (store_credit_applied >= 0);
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_amount NUMERIC(10, 2) NOT NULL DEFAULT 0
+  CHECK (payment_amount >= 0);
 
 CREATE TABLE IF NOT EXISTS order_items (
   order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
@@ -128,21 +140,27 @@ CREATE TABLE IF NOT EXISTS refund_requests (
   order_id BIGINT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
   buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
   reason TEXT NOT NULL,
+  refund_method TEXT NOT NULL DEFAULT 'original_payment'
+    CHECK (refund_method IN ('original_payment', 'store_credit')),
+  refund_amount NUMERIC(10, 2) NOT NULL DEFAULT 0 CHECK (refund_amount >= 0),
   status TEXT NOT NULL DEFAULT 'requested' CHECK (status IN ('requested', 'approved', 'rejected', 'completed')),
   reviewed_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
   reviewed_at TIMESTAMPTZ,
+  processed_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (order_id)
 );
+ALTER TABLE refund_requests ADD COLUMN IF NOT EXISTS refund_method TEXT NOT NULL DEFAULT 'original_payment'
+  CHECK (refund_method IN ('original_payment', 'store_credit'));
+ALTER TABLE refund_requests ADD COLUMN IF NOT EXISTS refund_amount NUMERIC(10, 2) NOT NULL DEFAULT 0
+  CHECK (refund_amount >= 0);
+ALTER TABLE refund_requests ADD COLUMN IF NOT EXISTS processed_at TIMESTAMPTZ;
+UPDATE refund_requests rr
+SET refund_amount = o.total_amount
+FROM orders o
+WHERE o.id = rr.order_id AND rr.refund_amount = 0 AND o.total_amount > 0;
 CREATE INDEX IF NOT EXISTS refund_requests_status_idx ON refund_requests(status);
-
-CREATE TABLE IF NOT EXISTS digital_deliveries (
-  order_id BIGINT PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
-  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
-  buyer_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-  access_token TEXT NOT NULL UNIQUE,
-  delivered_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+DROP TABLE IF EXISTS digital_deliveries;
 
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id);
 

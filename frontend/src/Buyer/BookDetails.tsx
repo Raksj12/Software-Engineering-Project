@@ -35,6 +35,7 @@ function BookDetails() {
   const [message, setMessage] = useState("Loading...");
   const [reviews, setReviews] = useState<Review[]>([]);
   const [averageRating, setAverageRating] = useState<number | null>(null);
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     fetchBook(id)
@@ -60,14 +61,20 @@ function BookDetails() {
     const response = await fetch("http://localhost:3000/api/cart", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ productId: Number(id), quantity: 1 }),
+      body: JSON.stringify({ productId: Number(id), quantity }),
     });
     const data = await response.json();
-    setMessage(response.ok ? "Book added to cart." : data.error || "Could not add book to cart.");
+    setMessage(response.ok ? `${quantity} ${book?.title || "book"} ${quantity === 1 ? "was" : "were"} added to your cart.` : data.error || "Could not add book to cart.");
+    if (response.ok) window.dispatchEvent(new Event("cart-changed"));
   }
 
   return (
     <main className="page">
+      {message && message !== "Loading..." && (
+        <p className={`status-message ${message.startsWith("Could not") ? "status-error" : "status-success"}`} role="status">
+          {message}
+        </p>
+      )}
       <Link className="muted" to="/buyer">← Back to books</Link>
 
       {book && (
@@ -86,6 +93,17 @@ function BookDetails() {
           {book.stock > 0 && (
             <div className="button-row">
               <button type="button" onClick={() => navigate(`/buyer/books/${book.id}/buy`)}>Buy Now</button>
+              <label className="quantity-control">
+                <span>Quantity</span>
+                <input
+                  type="number"
+                  min="1"
+                  max={book.stock}
+                  value={quantity}
+                  onChange={(event) => setQuantity(Math.min(book.stock, Math.max(1, Number(event.target.value) || 1)))}
+                  aria-label={`Quantity of ${book.title}`}
+                />
+              </label>
               <button className="secondary" type="button" onClick={addToCart}>Add to Cart</button>
             </div>
           )}
@@ -106,7 +124,7 @@ function BookDetails() {
           </div>
         </div>
       )}
-      {message && !book && <p className="status-message">{message}</p>}
+      {message === "Loading..." && <p className="status-message" role="status">{message}</p>}
     </main>
   );
 }

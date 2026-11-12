@@ -14,7 +14,8 @@ type Listing = {
   rejectionReason: string | null;
 };
 type Sale = { orderId: number; productId: number; title: string; quantity: number; fulfillmentStatus: string; carrier: string | null; trackingNumber: string | null };
-type Refund = { id: number; orderId: number; buyerName: string; reason: string; status: string };
+type Refund = { id: number; orderId: number; buyerName: string; reason: string; status: string; refundMethod?: string; refundAmount?: string };
+type EarningsLine = { title: string; itemsSold: number; grossSales: string; orderCount: number };
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Pending Review",
@@ -22,6 +23,10 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: "Rejected",
   archived: "Disabled by admin",
 };
+
+function isValidPrice(value: string): boolean {
+  return /^\d+(\.\d{1,2})?$/.test(value.trim()) && Number(value) > 0;
+}
 
 // Get the logged-in seller's own listings
 async function fetchMyListings() {
@@ -57,11 +62,27 @@ function SellerHome() {
   const [listMessage, setListMessage] = useState("");
   const [sales, setSales] = useState<Sale[]>([]);
   const [refunds, setRefunds] = useState<Refund[]>([]);
+  const [earnings, setEarnings] = useState<{ grossSales: string; itemsSold: number; orderCount: number } | null>(null);
+  const [earningsBreakdown, setEarningsBreakdown] = useState<EarningsLine[]>([]);
 
   useEffect(() => {
     fetchMyListings()
       .then(setListings)
       .catch((error) => setListMessage(error.message));
+  }, []);
+
+  useEffect(() => {
+    fetch("http://localhost:3000/api/seller/orders/earnings/breakdown", { headers: { Authorization: "Bearer " + (sessionStorage.getItem("authToken") || "") } })
+      .then((response) => response.json())
+      .then((data) => setEarningsBreakdown(data.breakdown || []))
+      .catch(() => setListMessage("Could not load earnings breakdown."));
+  }, []);
+
+  useEffect(() => {
+    fetch("http://localhost:3000/api/seller/orders/earnings", { headers: { Authorization: "Bearer " + (sessionStorage.getItem("authToken") || "") } })
+      .then((response) => response.json())
+      .then(setEarnings)
+      .catch(() => setListMessage("Could not load earnings."));
   }, []);
 
   useEffect(() => {
@@ -97,6 +118,10 @@ function SellerHome() {
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
+    if (!isValidPrice(price)) {
+      setMessage("Enter a valid price greater than 0 with no more than two decimal places (for example, 12.99).");
+      return;
+    }
 
     // Send the listing as form data so the cover image file can be included
     const formData = new FormData();
@@ -148,11 +173,47 @@ function SellerHome() {
     }
   }
 
+  const pendingSales = sales.filter((sale) => sale.fulfillmentStatus === "pending").length;
+  const openRefunds = refunds.filter((refund) => refund.status === "requested").length;
+
   return (
-    <main className="page">
-      <div className="page-heading"><div><p className="eyebrow">Seller studio</p><h2>Manage your bookstore</h2><p className="muted">List new books, track sales, and handle customer requests.</p></div></div>
-      <section className="form-card">
-      <h3>Upload a book</h3>
+    <main className="page seller-workspace">
+      <header className="seller-hero">
+        <div><p className="eyebrow">Seller workspace</p><h1>Operate your bookstore.</h1><p className="muted">A focused view of your catalog, fulfillment, earnings, and customer care.</p></div>
+        <span className="seller-live-status"><span /> Store active</span>
+      </header>
+      {listMessage && <p className="status-message">{listMessage}</p>}
+      <section className="seller-dashboard-metrics">
+        <div><span>Gross sales</span><strong>${Number(earnings?.grossSales || 0).toFixed(2)}</strong><small>eligible orders</small></div>
+        <div><span>Active listings</span><strong>{listings.filter((listing) => listing.status === "approved").length}</strong><small>published books</small></div>
+        <div><span>Fulfillment queue</span><strong>{pendingSales}</strong><small>orders to process</small></div>
+        <div><span>Customer care</span><strong>{openRefunds}</strong><small>refunds awaiting review</small></div>
+      </section>
+      {earnings && (
+        <section className="panel seller-control-panel">
+          <div className="seller-section-heading"><div><p className="eyebrow">Performance</p><h2>Earnings overview</h2></div><span className="pill">{earnings.itemsSold} items sold</span></div>
+          <div className="earnings-metrics">
+            <div><span className="muted">Gross sales</span><strong>${Number(earnings.grossSales).toFixed(2)}</strong></div>
+            <div><span className="muted">Items sold</span><strong>{earnings.itemsSold}</strong></div>
+            <div><span className="muted">Orders</span><strong>{earnings.orderCount}</strong></div>
+          </div>
+          <h3>Sales by listing</h3>
+          {earningsBreakdown.length === 0 ? <p className="muted">No completed sales yet.</p> : (
+            <div className="earnings-breakdown">
+              {earningsBreakdown.map((line) => (
+                <div className="earnings-line" key={line.title}>
+                  <strong>{line.title}</strong>
+                  <span>{line.itemsSold} items · {line.orderCount} orders</span>
+                  <b>${Number(line.grossSales || 0).toFixed(2)}</b>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+      <div className="seller-workspace-grid">
+      <section className="panel seller-control-panel">
+      <div className="seller-section-heading"><div><p className="eyebrow">Catalog</p><h2>Add a book</h2></div></div>
 
       <form onSubmit={handleUpload}>
         <input
@@ -202,7 +263,7 @@ function SellerHome() {
         <input
           type="number"
           placeholder="Price"
-          min="0"
+          min="0.01"
           step="0.01"
           value={price}
           onChange={(event) => setPrice(event.target.value)}
@@ -234,47 +295,30 @@ function SellerHome() {
 
       {message && <p className="status-message">{message}</p>}
 
-      <h2>My Listings</h2>
-
-      <p>{listMessage}</p>
-
       {listings.length === 0 && !listMessage && <p>You have not listed any books yet.</p>}
 
-      <ul className="admin-list">
+      <h3 className="seller-subheading">My listings</h3>
+      <ul className="seller-list">
         {listings.map((listing) => (
-          <li className="admin-item panel" key={listing.id}>
-            {listing.imagePath && (
-              <img src={`http://localhost:3000${listing.imagePath}`} alt={`Cover of ${listing.title}`} width={100} />
-            )}
-            <h3>{listing.title}</h3>
-            <p>by {listing.author}</p>
-            <p>
-              ${Number(listing.price).toFixed(2)} | {listing.stock} in stock | ISBN: {listing.isbn}
-            </p>
-            <p>Status: {STATUS_LABELS[listing.status] || listing.status}</p>
+          <li className="seller-list-item" key={listing.id}>
+            <div><strong>{listing.title}</strong><p className="muted">{listing.author} · ${Number(listing.price).toFixed(2)} · {listing.stock} in stock</p></div>
+            <span className="pill">{STATUS_LABELS[listing.status] || listing.status}</span>
             {listing.status === "rejected" && listing.rejectionReason && (
-              <p>Reason: {listing.rejectionReason}</p>
+              <small>Reason: {listing.rejectionReason}</small>
             )}
           </li>
         ))}
       </ul>
-      <h2>Sales and Orders</h2>
-      {sales.length === 0 ? <p>No sales yet.</p> : sales.map((sale) => (
-        <div key={`${sale.orderId}-${sale.productId}`}>
-          <p>Order #{sale.orderId}: {sale.quantity} x {sale.title} — {sale.fulfillmentStatus}</p>
-          {sale.fulfillmentStatus === "pending" && <button type="button" onClick={() => updateSale(sale, "process")}>Mark Processing</button>}
-          {sale.fulfillmentStatus === "processing" && <button type="button" onClick={() => updateSale(sale, "ship")}>Mark Shipped</button>}
-          {["pending", "processing"].includes(sale.fulfillmentStatus) && <button type="button" onClick={() => updateSale(sale, "cancel")}>Cancel</button>}
-        </div>
-      ))}
-      <h2>Refund Requests</h2>
-      {refunds.length === 0 ? <p>No refund requests.</p> : refunds.map((refund) => (
-        <div key={refund.id}>
-          <p>Order #{refund.orderId} from {refund.buyerName}: {refund.reason} ({refund.status})</p>
-          {refund.status === "requested" && <><button type="button" onClick={() => decideRefund(refund.id, "approve")}>Approve Refund</button><button type="button" onClick={() => decideRefund(refund.id, "reject")}>Deny Refund</button></>}
-        </div>
-      ))}
       </section>
+      <section className="panel seller-control-panel">
+        <div className="seller-section-heading"><div><p className="eyebrow">Operations</p><h2>Fulfillment queue</h2></div><span className="pill">{pendingSales} pending</span></div>
+        {sales.length === 0 ? <p className="muted">No sales yet.</p> : <div className="seller-queue">{sales.map((sale) => <article className="seller-queue-item" key={`${sale.orderId}-${sale.productId}`}><div><strong>Order #{sale.orderId} · {sale.title}</strong><p className="muted">{sale.quantity} copy/copies · {sale.fulfillmentStatus}</p></div><div className="seller-action-row">{sale.fulfillmentStatus === "pending" && <button type="button" onClick={() => updateSale(sale, "process")}>Process</button>}{sale.fulfillmentStatus === "processing" && <button type="button" onClick={() => updateSale(sale, "ship")}>Mark shipped</button>}{["pending", "processing"].includes(sale.fulfillmentStatus) && <button className="danger" type="button" onClick={() => updateSale(sale, "cancel")}>Cancel</button>}</div></article>)}</div>}
+      </section>
+      <section className="panel seller-control-panel">
+        <div className="seller-section-heading"><div><p className="eyebrow">Customer care</p><h2>Refund requests</h2></div><span className="pill">{openRefunds} open</span></div>
+        {refunds.length === 0 ? <p className="muted">No refund requests.</p> : <div className="seller-queue">{refunds.map((refund) => <article className="seller-queue-item" key={refund.id}><div><strong>Order #{refund.orderId}</strong><p className="muted">{refund.buyerName} · ${Number(refund.refundAmount || 0).toFixed(2)} via {refund.refundMethod === "store_credit" ? "store credit" : "original payment"}</p><small>{refund.reason}</small></div>{refund.status === "requested" && <div className="seller-action-row"><button type="button" onClick={() => decideRefund(refund.id, "approve")}>Approve</button><button className="danger" type="button" onClick={() => decideRefund(refund.id, "reject")}>Deny</button></div>}</article>)}</div>}
+      </section>
+      </div>
     </main>
   );
 }
