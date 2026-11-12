@@ -11,6 +11,11 @@ const FIELDS: Record<string, string> = {
   isbn: "replace(p.isbn, '-', '')",
 };
 
+searchRouter.get("/genres", async (_req, res) => {
+  const result = await pool.query("SELECT name FROM genres ORDER BY name");
+  res.json({ genres: result.rows.map((row) => row.name) });
+});
+
 searchRouter.get("/", async (req, res) => {
   const field = typeof req.query.field === "string" ? req.query.field : "title";
   const genre = typeof req.query.genre === "string" ? req.query.genre.trim() : "";

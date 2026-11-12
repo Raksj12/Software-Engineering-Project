@@ -154,3 +154,15 @@ CREATE TABLE IF NOT EXISTS images (
   uploaded_by BIGINT REFERENCES users(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+
+CREATE TABLE IF NOT EXISTS genres (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE
+);
+
+INSERT INTO genres (name) VALUES
+  ('Classics'), ('Programming'), ('Science Fiction'), ('Fantasy'),
+  ('Mystery'), ('Romance'), ('Non-Fiction'), ('Biography'),
+  ('History'), ('Children')
+ON CONFLICT (name) DO NOTHING;
