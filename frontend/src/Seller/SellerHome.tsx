@@ -42,6 +42,7 @@ async function fetchMyListings() {
 
 function SellerHome() {
   const [listings, setListings] = useState<Listing[]>([]);
+  const [genreOptions, setGenreOptions] = useState<string[]>([]);
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [isbn, setIsbn] = useState("");
@@ -62,6 +63,13 @@ function SellerHome() {
     fetchMyListings()
       .then(setListings)
       .catch((error) => setListMessage(error.message));
+  }, []);
+
+  useEffect(() => {
+  fetch("http://localhost:3000/api/listings/genres")
+    .then((r) => r.json())
+    .then((d) => setGenreOptions(d.genres || []))
+    .catch(() => setGenreOptions([]));
   }, []);
 
   useEffect(() => {
@@ -179,13 +187,12 @@ function SellerHome() {
           required
         />
 
-        <input
-          type="text"
-          placeholder="Genre"
-          value={genre}
-          onChange={(event) => setGenre(event.target.value)}
-          required
-        />
+        <select value={genre} onChange={(event) => setGenre(event.target.value)} required>
+          <option value="">Select a genre</option>
+          {genreOptions.map((g) => (
+            <option key={g} value={g}>{g}</option>
+          ))}
+        </select>
 
         <select value={condition} onChange={(event) => setCondition(event.target.value)}>
           <option value="new">New</option>

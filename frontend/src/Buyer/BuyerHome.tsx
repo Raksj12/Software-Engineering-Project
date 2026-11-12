@@ -16,8 +16,9 @@ type Book = {
 };
 
 // Get published books, optionally filtered by a search term
-async function fetchBooks(query: string, field: string) {
+async function fetchBooks(query: string, field: string, genre = "") {
   const params = new URLSearchParams({ q: query, field });
+  if (genre) params.set("genre", genre);
   const response = await fetch(`http://localhost:3000/api/listings?${params}`);
   const data = await response.json();
 
@@ -33,6 +34,8 @@ function BuyerHome() {
   const [query, setQuery] = useState("");
   const [field, setField] = useState("title");
   const [message, setMessage] = useState("");
+  const [genres, setGenres] = useState<string[]>([]);
+  const [selectedGenre, setSelectedGenre] = useState("");
 
   // Show all published books when the page opens
   useEffect(() => {
@@ -44,17 +47,35 @@ function BuyerHome() {
       .catch(() => setMessage("Could not connect to the server."));
   }, []);
 
+  useEffect(() => {
+    fetch("http://localhost:3000/api/listings/genres")
+      .then((r) => r.json())
+      .then((d) => setGenres(d.genres || []))
+      .catch(() => setGenres([]));
+  }, []);
+
   async function handleSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage("");
 
     try {
-      const data = await fetchBooks(query, field);
+      const data = await fetchBooks(query, field, selectedGenre);
       setBooks(data.products);
       setMessage(data.message || "");
     } catch (error) {
       setBooks([]);
       setMessage(error instanceof Error ? error.message : "Could not connect to the server.");
+    }
+  }
+
+  async function chooseGenre(genre: string) {
+    setSelectedGenre(genre);
+    try {
+      const data = await fetchBooks(query, field, genre);
+      setBooks(data.products);
+      setMessage(data.message || "");
+    } catch {
+      setMessage("Could not connect to the server.");
     }
   }
 
@@ -75,6 +96,13 @@ function BuyerHome() {
           <h2>Books for sale</h2>
         </div>
         <span className="pill">{books.length} {books.length === 1 ? "book" : "books"}</span>
+      </div>
+
+      <div className="button-row">
+        <button type="button" className={selectedGenre === "" ? "" : "secondary"} onClick={() => chooseGenre("")}>All</button>
+        {genres.map((g) => (
+          <button key={g} type="button" className={selectedGenre === g ? "" : "secondary"} onClick={() => chooseGenre(g)}>{g}</button>
+        ))}
       </div>
 
       <form className="search-bar" onSubmit={handleSearch}>

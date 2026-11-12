@@ -12,6 +12,12 @@ const LISTING_COLUMNS = `id, title, author, isbn, genre, condition, description,
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
 
+// Returns the canonical genre name from the genres table, or null if it isn't listed
+async function canonicalGenre(value: string): Promise<string | null> {
+  const result = await pool.query("SELECT name FROM genres WHERE lower(name) = lower($1)", [value]);
+  return result.rowCount ? result.rows[0].name : null;
+}
+
 // The logged-in seller's own listings, in every review state
 sellerListingsRouter.get("/", async (req, res) => {
   const result = await pool.query(
@@ -28,16 +34,22 @@ sellerListingsRouter.patch("/:id", async (req, res) => {
   const title = text(body.title), author = text(body.author), genre = text(body.genre), description = text(body.description);
   const condition = text(body.condition).toLowerCase();
   const price = Number(body.price), stock = Number(body.stock);
+
   if (!title || !author || !genre || !description || !CONDITIONS.includes(condition) ||
       !Number.isFinite(price) || price < 0 || !Number.isInteger(stock) || stock < 0) {
     res.status(400).json({ error: "Valid title, author, genre, description, condition, price, and stock are required." }); return;
   }
+
+  const validGenre = await canonicalGenre(genre);
+  if (!validGenre) { res.status(400).json({ error: "Please choose a genre from the list." }); return; }
+
   const result = await pool.query(
     `UPDATE products SET title=$1, author=$2, genre=$3, description=$4, condition=$5, price=$6, stock=$7,
        status=CASE WHEN status='approved' THEN 'pending' ELSE status END, updated_at=NOW()
      WHERE id=$8 AND seller_id=$9 RETURNING ${LISTING_COLUMNS}`,
-    [title, author, genre, description, condition, price, stock, listingId, req.user!.id],
+    [title, author, validGenre, description, condition, price, stock, listingId, req.user!.id],
   );
+
   if (!result.rowCount) { res.status(404).json({ error: "Listing not found." }); return; }
   res.json({ listing: result.rows[0] });
 });
@@ -65,6 +77,11 @@ sellerListingsRouter.post("/", uploadImage, async (req, res) => {
 
   if (!title || !author || !genre || !description) {
     res.status(400).json({ error: "Title, author, genre, and description are required." });
+    return;
+  }
+  const validGenre = await canonicalGenre(genre);
+  if (!validGenre) {
+    res.status(400).json({ error: "Please choose a genre from the list." });
     return;
   }
   if (!isValidIsbn(isbn)) {
@@ -99,7 +116,7 @@ sellerListingsRouter.post("/", uploadImage, async (req, res) => {
       `INSERT INTO products (seller_id, title, author, isbn, genre, condition, description, price, stock, image_path, status)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
        RETURNING ${LISTING_COLUMNS}`,
-      [req.user!.id, title, author, isbn, genre, condition, description, price, stock, imagePath],
+      [req.user!.id, title, author, isbn, validGenre, condition, description, price, stock, imagePath],
     );
     await client.query("COMMIT");
     res.status(201).json({ listing: result.rows[0], message: "Listing submitted for admin review." });
