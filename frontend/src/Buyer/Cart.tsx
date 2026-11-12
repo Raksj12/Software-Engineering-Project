@@ -39,6 +39,18 @@ function Cart() {
       setMessage(data.error || "Could not remove item.");
       return;
     }
+
+    await loadCart();
+  }
+
+  async function updateQuantity(productId: number, quantity: number) {
+    const response = await fetch(`http://localhost:3000/api/cart/${productId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + (sessionStorage.getItem("authToken") || "") },
+      body: JSON.stringify({ quantity }),
+    });
+    const data = await response.json();
+    if (!response.ok) { setMessage(data.error || "Could not update quantity."); return; }
     await loadCart();
   }
 
@@ -53,7 +65,7 @@ function Cart() {
       <div className="cart-list">
       {cart.items.map((item) => (
         <div className="cart-item panel" key={item.productId}>
-          <div><strong>{item.title}</strong><p className="muted">${Number(item.price).toFixed(2)} × {item.quantity}</p></div>
+          <div><strong>{item.title}</strong><p className="muted">${Number(item.price).toFixed(2)} × {item.quantity}</p><input aria-label={`Quantity for ${item.title}`} type="number" min="1" max={item.stock} value={item.quantity} onChange={(event) => updateQuantity(item.productId, Number(event.target.value))} /></div>
           <button className="danger" type="button" onClick={() => remove(item.productId)}>Remove</button>
         </div>
       ))}

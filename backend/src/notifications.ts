@@ -5,6 +5,11 @@ export async function createNotification(userId: number, message: string): Promi
   await pool.query("INSERT INTO notifications (user_id, message) VALUES ($1, $2)", [userId, message]);
 }
 
+export async function notifyAdmins(message: string): Promise<void> {
+  const admins = await pool.query("SELECT id FROM users WHERE role='admin' AND status='approved'");
+  await Promise.all(admins.rows.map((admin) => createNotification(admin.id, message)));
+}
+
 export const notificationsRouter = Router();
 
 notificationsRouter.get("/", async (req, res) => {

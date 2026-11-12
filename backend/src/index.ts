@@ -220,8 +220,21 @@ app.patch("/api/auth/me", authRequired, async (req, res, next) => {
   }
 });
 
-app.get("/api/buyer/account", authRequired, requireRoles("buyer"), (req, res) => {
-  res.json({ user: req.user });
+app.get("/api/buyer/account", authRequired, requireRoles("buyer"), async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, email, full_name AS "fullName", role, status, store_credit AS "storeCredit"
+       FROM users WHERE id=$1`,
+      [req.user!.id],
+    );
+    if (!result.rowCount) {
+      res.status(404).json({ error: "Buyer account not found." });
+      return;
+    }
+    res.json({ user: result.rows[0] });
+  } catch (error) {
+    next(error);
+  }
 });
 
 app.get("/api/seller/account", authRequired, requireRoles("seller"), (req, res) => {
@@ -251,15 +264,15 @@ app.get("/api/products", async (_req, res, next) => {
 app.use("/api/wishlist", wishlistRoutes);
 
 // Only logged in buyers can access review submission
-app.use("/api/reviews", authRequired, requireRoles("buyer"), reviewsRoutes);
+app.use("/api/reviews", authRequired, requireRoles("buyer", "admin"), reviewsRoutes);
 
 app.use("/api/admin", authRequired, requireRoles("admin"), adminRouter);
 app.use("/api/notifications", authRequired, notificationsRouter);
 app.use("/api/listings", searchRouter);
-app.use("/api/seller/orders", authRequired, requireRoles("seller"), fulfillmentRouter);
-app.use("/api/seller/listings", authRequired, requireRoles("seller"), sellerListingsRouter);
-app.use("/api/orders", authRequired, requireRoles("buyer"), ordersRouter);
-app.use("/api/cart", authRequired, requireRoles("buyer"), cartRouter);
+app.use("/api/seller/orders", authRequired, requireRoles("seller", "admin"), fulfillmentRouter);
+app.use("/api/seller/listings", authRequired, requireRoles("seller", "admin"), sellerListingsRouter);
+app.use("/api/orders", authRequired, requireRoles("buyer", "admin"), ordersRouter);
+app.use("/api/cart", authRequired, requireRoles("buyer", "admin"), cartRouter);
 app.use("/api/images", imagesRouter);
 
 app.get("/api/products/:productId/reviews", async (req, res, next) => {

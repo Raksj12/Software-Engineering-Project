@@ -34,6 +34,7 @@ function Login() {
 
       // Save the authentication token.
       sessionStorage.setItem("authToken", data.token);
+      window.dispatchEvent(new Event("auth-changed"));
       setIsLoggedIn(true);
 
       setMessage(`Welcome, ${data.user.fullName}!`);
@@ -67,6 +68,7 @@ function Login() {
       // Clear the local session even if the server is unavailable.
     } finally {
       sessionStorage.removeItem("authToken");
+      window.dispatchEvent(new Event("auth-changed"));
       setIsLoggedIn(false);
       setEmail("");
       setPassword("");

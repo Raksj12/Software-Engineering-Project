@@ -45,6 +45,24 @@ searchRouter.get("/", async (req, res) => {
   });
 });
 
+searchRouter.get("/compare", async (req, res) => {
+  const rawIds = typeof req.query.ids === "string" ? req.query.ids.split(",") : [];
+  const ids = [...new Set(rawIds.map(Number).filter((value) => Number.isSafeInteger(value) && value > 0))].slice(0, 4);
+  if (ids.length < 2) {
+    res.status(400).json({ error: "Select at least two valid books to compare." });
+    return;
+  }
+  const result = await pool.query(
+    `SELECT p.id, p.title, p.author, p.isbn, p.genre, p.condition, p.description, p.price, p.stock,
+            p.image_path AS "imagePath", u.full_name AS "sellerName"
+     FROM products p JOIN users u ON u.id = p.seller_id
+     WHERE p.id = ANY($1::bigint[]) AND p.status = 'approved'
+     ORDER BY p.title`,
+    [ids],
+  );
+  res.json({ products: result.rows });
+});
+
 searchRouter.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {

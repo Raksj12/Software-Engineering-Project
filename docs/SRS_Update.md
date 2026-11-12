@@ -9,6 +9,8 @@
 | 1.1 | 2026-11-08 | Added cart, checkout, order history, refunds, seller fulfillment, admin oversight, and review retrieval. |
 | 1.2 | 2026-11-08 | Reduced the MVP scope to the implemented local demonstration. Deferred production integrations and incomplete secondary workflows. |
 | 1.3 | 2026-11-11 | Verified the checkout and order implementation, recorded the current validation result, and clarified partial/deferred requirements. |
+| 1.4 | 2026-11-11 | Added buyer comparison, quantity editing, state tax calculation, role home navigation, seller earnings, and administrator order intervention. |
+| 1.5 | 2026-11-11 | Removed digital delivery and the deferred requirements no longer in scope; added seller price validation and buyer order editing/returns. |
 
 ## Committed MVP requirements
 
@@ -33,6 +35,14 @@ The Sprint 4 MVP includes the following requirements:
   prohibited-content checks.
 - Buyer wishlist add/view/remove behavior, duplicate prevention, and visibility
   of unavailable saved items.
+- Buyer comparison of two to four approved books using price, author, genre,
+  condition, stock, seller, and listing type.
+- Cart quantity editing with stock limits and quantity-aware checkout totals.
+- State-based sales tax calculation shown in checkout and persisted with each
+  order.
+- Role-specific home navigation, a cart item-quantity badge, seller earnings
+  visibility with per-listing breakdown, and administrator order-status
+  intervention with audit logging and buyer notification.
 
 ## Removed or deferred from the Sprint 4 SRS scope
 
@@ -46,9 +56,9 @@ must not be presented as completed features:
 | Full inactivity-reset semantics | Deferred | The current authentication token has a fixed lifetime; activity does not reset the expiration timer. |
 | Seller password and store-name profile workflow | Deferred | These profile fields are not required for the checkout and marketplace demonstration. |
 | Dedicated grouped genre-browse experience | Deferred | Genre filtering/search remains available, but a separate grouped browsing interface is not part of the MVP. |
-| Complete digital-product delivery experience | Deferred | Digital delivery is not demonstrated as a complete buyer-facing product flow. |
 | Full browser E2E and Newman execution | Deferred as automation work | The test collection and scripts are included, but the project does not claim that Playwright or Newman runs were completed. |
 | Production hosting, email provider, and HTTPS deployment | Deferred | Sprint 4 is a local PostgreSQL/Express/Vite demonstration. |
+| Automatic public IP geolocation | Deferred | The application records the request IP for order audit and supports a trusted `IP_STATE_MAP` configuration, but does not send buyer IP addresses to an external geolocation provider. Buyers select their tax state at checkout. |
 
 ## Status interpretation
 
@@ -99,8 +109,8 @@ than being reported as fully complete:
 | Itemized pre-payment order review | Checkout collects the shipping address and card-format fields, but does not render a separate itemized order summary before submission. | Partial; UI follow-up required |
 | Payment processing and failed-payment simulation | Only local card-format validation exists. There is no payment provider, real charge, or provider-failure test. Database errors and stock conflicts are transactionally rolled back. | Deferred |
 | Return-expiration enforcement | Refund eligibility is based on order state and refund status; no time-window/expiration rule is implemented. | Deferred |
-| Seller notification of a new refund request | Sellers can retrieve refund requests and decide them, but the buyer refund-request route does not create a seller notification. | Partial |
-| Digital delivery | The backend can create a digital-delivery token during checkout, but a complete buyer-facing delivery/access flow is not implemented. | Deferred |
+| Seller notification of a new refund request | Each seller attached to the order receives an in-app notification when the buyer submits a refund request. | Completed |
+| Returns | The buyer action is labelled “Request Return / Refund,” but the implemented workflow is a local refund request with seller/admin approval. Physical return labels, shipment tracking, inspection, and restocking are not implemented. | Partial; physical-return workflow deferred |
 | Browser E2E/Newman execution | The scripts and collection exist, but no browser or Newman run was completed during this verification. | Deferred as validation work |
 
 ### Automated verification result
@@ -123,3 +133,67 @@ collection executed all seven requests with no request failures, but it
 contains no assertions and does not persist the login token, so protected
 requests in that collection returned their expected unauthorized responses.
 Browser E2E and Newman assertion coverage remain follow-up validation work.
+
+## Feature additions verified after Sprint 4
+
+- **Comparison:** `GET /api/listings/compare?ids=...` compares up to four
+  approved listings. The buyer catalog provides selection controls and a
+  comparison table.
+- **Quantities:** cart quantities can be edited with `PATCH /api/cart/:productId`;
+  buy-now and cart checkout validate whole-number quantities and available
+  stock.
+- **Taxes:** checkout requires a two-letter US state and applies the configured
+  base state rate. Orders persist `tax_state`, `tax_rate`, `tax_amount`, and
+  the final total. The request IP is stored as order audit metadata. A trusted
+  deployment may configure `IP_STATE_MAP=address:STATE,...`; no external IP
+  lookup is performed by default.
+- **Refunds:** buyers provide a reason, sellers receive an in-app notification,
+  sellers and administrators can approve or reject requests, and decisions
+  update the local order/refund state and notify the buyer.
+- **Order editing and returns:** buyers can edit the shipping address on paid
+  orders before fulfillment, and can submit a reasoned return/refund request.
+  The current return workflow updates local order state; physical return
+  shipping, inspection, and restocking remain outside the MVP.
+- **Role homepages:** `/home` routes authenticated users to the correct buyer,
+  seller, or administrator dashboard.
+- **Cart quantity badge:** the header displays the total quantity in the
+  authenticated buyer's cart and refreshes after cart, login, and logout
+  changes.
+- **Seller earnings:** sellers can view gross sales, order count, and items sold
+  through the seller dashboard, including a per-listing earnings breakdown.
+- **Returns/refunds:** the buyer-facing action clearly identifies the current
+  local “Return / Refund” request workflow; it does not claim a complete
+  physical-return process.
+- **Refund processing:** buyers select store credit or the original payment
+  method. Approved refunds are automatically marked completed; store credit is
+  added to the buyer balance, while original-payment processing is recorded
+  locally because no payment gateway is connected. The buyer, seller, and
+  administrators receive completion notifications.
+- **Buyer store-credit visibility:** buyers can view their current BookHaven
+  store-credit balance on the buyer home and order-history pages. Each eligible
+  refund request provides an explicit destination choice between the original
+  payment method and BookHaven store credit.
+- **Administrator intervention:** administrators can override an order status,
+  notify the buyer, and receive an `admin_actions` audit entry. Existing
+  moderation and refund controls remain available.
+- **Role inboxes:** administrators receive supervision messages for buyer
+  orders, order edits, returns/refunds, wishlist activity, and seller actions.
+  Sellers receive buyer return/refund messages and wishlist interest for their
+  listings. Buyers receive order, shipping, return/refund, and account
+  notifications. All roles open Inbox separately from their dashboards through
+  the shared navigation, see an unread count, and mark messages read.
+
+## Latest verification status — 2026-11-11
+
+The latest implementation changes were validated with:
+
+- `frontend` `npm run lint`: passed.
+- `frontend` `npm run build`: passed.
+- `backend` `npm run build`: passed.
+- `backend` `npm test`: **23 passed, 0 failed**.
+
+The verification confirmed that the cart badge component is mounted in the
+global header, the seller breakdown endpoint is type-safe and buildable, seller
+prices are validated on both client and server, and buyer order editing and
+return/refund requests have explicit authorization and state checks.
+Browser-level interaction tests remain outside this verification run.

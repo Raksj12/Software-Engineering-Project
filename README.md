@@ -79,7 +79,7 @@ historical requirements baseline; deferred items are not claimed as completed.
 4. **Search and Browse** — buyers search published listings by title, author, genre, or ISBN, or browse by genre. Results are sorted alphabetically by title; unmatched searches show a clear "no results" message.
 5. **Shopping Cart and Checkout** — add/remove cart items with live subtotal updates, login-gated checkout, order creation, transactional stock updates, and development payment-format validation. No real payment gateway is connected.
 6. **Returns and Refunds** — buyers can request a refund with a reason, and sellers or administrators can approve or deny it. The demo updates local order/refund state; it does not issue a real payment refund.
-7. **Order Fulfillment** — sellers process physical orders, attach carrier/tracking information, mark delivery, or cancel eligible orders. The complete digital-product delivery experience is deferred.
+7. **Order Fulfillment** — sellers process physical orders, attach carrier/tracking information, mark delivery, or cancel eligible orders. The marketplace supports physical book fulfillment.
 8. **Reviews and Ratings** — a buyer can leave one star rating + written review per book, but only after their order for that book is marked "Delivered." Every review is screened against the prohibited-content list before publishing.
 9. **Wishlist** — buyers save books for later, get notified of duplicates instead of creating them, and see saved-but-now-unavailable books marked rather than silently removed.
 
@@ -106,7 +106,7 @@ The goal of Sprint 3 is to get the web app all the way to the final confirmation
 
 The Sprint 4 scope revision supersedes this earlier planning note. Checkout
 completion, order history, refunds, and fulfillment are now included in the
-local MVP. Production payment processing, complete digital delivery, and the
+local MVP. Production payment processing and the
 other deferred items are listed in [`docs/SRS_Update.md`](./docs/SRS_Update.md).
 
 ## Tech Stack
@@ -178,6 +178,8 @@ cd ..\backend
 #      DB_NAME=bookhaven
 #      DB_USER=your_postgres_user
 #      DB_PASSWORD=your_postgres_password
+# Optional trusted proxy mapping for tax state, for example 203.0.113.10:CA
+IP_STATE_MAP=
 #      AUTH_SECRET=any_long_random_string
 copy .env.example .env
 
@@ -205,7 +207,9 @@ The backend runs on `http://localhost:3000` and the Vite frontend runs on `http:
 
 The application includes buyer cart, checkout, order history, and refund
 requests; seller fulfillment and refund decisions; and administrator order
-and refund oversight.
+and refund oversight. Buyers can compare up to four books, edit cart
+quantities, and see state-based tax at checkout. Sellers can view earnings,
+and administrators can override order statuses with audit logging.
 
 ```powershell
 cd backend
@@ -372,7 +376,7 @@ Every functional requirement in the SRS (REQ-1 through REQ-57) traces back to at
 - [x] Sprint 2: Search & browse, shopping cart & checkout flow
 - [x] Sprint 3 foundation: PostgreSQL schema, authentication/authorization, 404 page, and data population script
 - [x] Sprint 4 MVP: Order fulfillment, returns/refunds, and admin oversight
-- [ ] Later release: Third-party payment gateway, production deployment, complete digital delivery, and full browser/API automation execution
+- [ ] Later release: Third-party payment gateway, production deployment, and full browser/API automation execution
 - [ ] Production deployment environment selection
 
 ## Documentation

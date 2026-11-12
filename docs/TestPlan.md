@@ -124,3 +124,7 @@ TC-023 initially returned HTTP 500 because the refund endpoint reused one SQL
 parameter as both a buyer ID and a text refund reason. The query in
 `backend/src/orders.ts` was corrected to bind the refund reason separately.
 The test was rerun against PostgreSQL and returned the expected HTTP 404.
+
+The post-Sprint-4 additions (comparison, quantity/tax checkout, seller price
+validation, buyer order editing/returns, and administrator order intervention) are implemented but
+still require dedicated seeded integration fixtures before being marked Pass.

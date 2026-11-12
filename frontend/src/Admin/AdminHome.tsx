@@ -5,159 +5,170 @@ type PendingListing = {
   title: string;
   author: string;
   isbn: string;
-  genre: string;
-  condition: string;
-  description: string;
   price: string;
   stock: number;
   sellerName: string;
-  imagePath: string | null;
   createdAt: string;
   flagged: boolean;
   matchedPhrases: string[];
   isbnValid: boolean;
 };
-type AdminOrder = { id: number; buyerName: string; status: string; totalAmount: string; refundStatus: string };
-type AdminRefund = { id: number; orderId: number; buyerName: string; reason: string; status: string };
+type AdminRefund = { id: number; orderId: number; buyerEmail: string; reason: string; status: string; refundMethod: string; refundAmount: string };
+type User = { id: number; email: string; fullName: string; role: string; status: string };
+type Word = { id: number; phrase: string };
 
-// Get listings waiting for review, oldest first
-async function fetchPendingListings() {
-  const token = sessionStorage.getItem("authToken");
-  const response = await fetch("http://localhost:3000/api/admin/listings?status=pending", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+const authHeaders = () => ({ Authorization: "Bearer " + (sessionStorage.getItem("authToken") || "") });
+
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`http://localhost:3000${path}`, { headers: authHeaders() });
   const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.error || "Could not load pending listings.");
-  }
-
-  return data.listings as PendingListing[];
+  if (!response.ok) throw new Error(data.error || "Could not load admin data.");
+  return data as T;
 }
 
 function AdminHome() {
   const [listings, setListings] = useState<PendingListing[]>([]);
+  const [refunds, setRefunds] = useState<AdminRefund[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [words, setWords] = useState<Word[]>([]);
+  const [phrase, setPhrase] = useState("");
   const [reasons, setReasons] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
-  const [orders, setOrders] = useState<AdminOrder[]>([]);
-  const [refunds, setRefunds] = useState<AdminRefund[]>([]);
+
+  async function loadControlCenter() {
+    const [listingData, refundData, userData, wordData] = await Promise.all([
+      getJson<{ listings: PendingListing[] }>("/api/admin/listings?status=pending"),
+      getJson<{ refunds: AdminRefund[] }>("/api/admin/refunds"),
+      getJson<{ users: User[] }>("/api/admin/users?status=pending"),
+      getJson<{ words: Word[] }>("/api/admin/prohibited-words"),
+    ]);
+    setListings(listingData.listings);
+    setRefunds(refundData.refunds);
+    setUsers(userData.users);
+    setWords(wordData.words);
+  }
 
   useEffect(() => {
-    fetchPendingListings()
-      .then(setListings)
-      .catch((error) => setMessage(error.message));
+    // Load the initial control-center snapshot after mounting.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadControlCenter().catch((error) => setMessage(error instanceof Error ? error.message : "Could not load control center."));
   }, []);
 
-  useEffect(() => {
-    const token = sessionStorage.getItem("authToken");
-    Promise.all([
-      fetch("http://localhost:3000/api/admin/orders", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
-      fetch("http://localhost:3000/api/admin/refunds", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json()),
-    ]).then(([orderData, refundData]) => {
-      setOrders(orderData.orders || []);
-      setRefunds(refundData.refunds || []);
-    }).catch(() => setMessage("Could not load orders or refunds."));
-  }, []);
+  async function post(path: string, body?: unknown) {
+    const response = await fetch(`http://localhost:3000${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Command failed.");
+    return data;
+  }
+
+  async function reviewListing(id: string, action: "approve" | "reject") {
+    try {
+      await post(`/api/admin/listings/${id}/${action}`, { reason: reasons[id] || "" });
+      setMessage(action === "approve" ? "Listing approved and published." : "Listing rejected with an audit record.");
+      await loadControlCenter();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Listing review failed."); }
+  }
 
   async function decideRefund(id: number, decision: "approve" | "reject") {
-    const token = sessionStorage.getItem("authToken");
-    const response = await fetch(`http://localhost:3000/api/admin/refunds/${id}/${decision}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
-    const data = await response.json();
-    setMessage(data.error || (response.ok ? "Refund updated." : "Could not update refund."));
-  }
-
-  // Approve or reject a listing, then refresh the queue
-  async function reviewListing(id: string, action: "approve" | "reject") {
-    setMessage("");
-
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/listings/${id}/${action}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
-        },
-        body: JSON.stringify({ reason: reasons[id] || "" }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage(data.error || `Could not ${action} the listing.`);
-        return;
-      }
-
-      setMessage(action === "approve" ? "Listing approved." : "Listing rejected.");
-      setListings(await fetchPendingListings());
-    } catch {
-      setMessage("Could not connect to the server.");
-    }
+      await post(`/api/admin/refunds/${id}/${decision}`);
+      setMessage(decision === "approve" ? "Refund processed and notifications sent." : "Refund denied.");
+      await loadControlCenter();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Refund decision failed."); }
   }
+
+  async function changeUser(id: number, action: "approve" | "disable") {
+    try {
+      await post(`/api/admin/users/${id}/${action}`);
+      setMessage(action === "approve" ? "Account approved." : "Account disabled.");
+      await loadControlCenter();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Account command failed."); }
+  }
+
+  async function addPhrase(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    try {
+      await post("/api/admin/prohibited-words", { phrase });
+      setPhrase("");
+      setMessage("Safety phrase added.");
+      await loadControlCenter();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Could not add safety phrase."); }
+  }
+
+  async function removePhrase(id: number) {
+    const response = await fetch(`http://localhost:3000/api/admin/prohibited-words/${id}`, { method: "DELETE", headers: authHeaders() });
+    if (!response.ok) {
+      const data = await response.json();
+      setMessage(data.error || "Could not remove safety phrase.");
+      return;
+    }
+    setMessage("Safety phrase removed.");
+    await loadControlCenter();
+  }
+
+  async function rescan() {
+    try {
+      const data = await post("/api/admin/prohibited-words/rescan");
+      setMessage(`Safety scan complete: ${data.flaggedCount} pending listing(s) flagged.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Safety scan failed."); }
+  }
+
+  const openRefunds = refunds.filter((refund) => refund.status === "requested");
 
   return (
-    <main className="page">
-      <div className="page-heading"><div><p className="eyebrow">Platform control</p><h2>Administration dashboard</h2><p className="muted">Review marketplace activity and keep BookHaven trustworthy.</p></div></div>
-      <section className="panel form-card">
-      <h3>Book upload requests</h3>
-
+    <main className="page admin-control-center">
+      <header className="admin-hero">
+        <div>
+          <p className="eyebrow">Admin control center</p>
+          <h1>Run the marketplace.</h1>
+          <p className="muted">Moderate listings, resolve trust issues, manage accounts, and keep BookHaven healthy.</p>
+        </div>
+        <div className="admin-live-status"><span /> Systems operational</div>
+      </header>
       {message && <p className="status-message">{message}</p>}
 
-      {listings.length === 0 && <p>There are no listings waiting for review.</p>}
-
-      <ul className="admin-list">
-        {listings.map((listing) => (
-          <li className="admin-item panel" key={listing.id}>
-            {listing.imagePath ? (
-              <img src={`http://localhost:3000${listing.imagePath}`} alt={`Cover of ${listing.title}`} width={150} />
-            ) : (
-              <p>No cover image</p>
-            )}
-            <h3>{listing.title}</h3>
-            <p>by {listing.author}</p>
-            <p>Seller: {listing.sellerName}</p>
-            <p>Submitted: {new Date(listing.createdAt).toLocaleString()}</p>
-            <p>
-              ${Number(listing.price).toFixed(2)} | {listing.stock} in stock | Genre: {listing.genre} |
-              Condition: {listing.condition}
-            </p>
-            <p>ISBN: {listing.isbn} {listing.isbnValid ? "(valid)" : "(INVALID)"}</p>
-            <p>{listing.description}</p>
-
-            {listing.flagged && (
-              <p>Warning: contains prohibited words: {listing.matchedPhrases.join(", ")}</p>
-            )}
-
-            <button type="button" onClick={() => reviewListing(listing.id, "approve")}>
-              Approve
-            </button>
-
-            <input
-              type="text"
-              placeholder="Reason for rejection"
-              value={reasons[listing.id] || ""}
-              onChange={(event) => setReasons({ ...reasons, [listing.id]: event.target.value })}
-            />
-
-            <button type="button" onClick={() => reviewListing(listing.id, "reject")}>
-              Reject
-            </button>
-          </li>
-        ))}
-      </ul>
+      <section className="admin-metrics" aria-label="Marketplace overview">
+        <div><span>Listing queue</span><strong>{listings.length}</strong><small>awaiting review</small></div>
+        <div><span>Refund queue</span><strong>{openRefunds.length}</strong><small>needs a decision</small></div>
+        <div><span>Account queue</span><strong>{users.length}</strong><small>awaiting approval</small></div>
+        <div><span>Safety rules</span><strong>{words.length}</strong><small>active phrases</small></div>
       </section>
-      <section className="panel form-card">
-      <h3>Platform orders</h3>
-      {orders.length === 0 ? <p>No orders.</p> : orders.map((order) => <p key={order.id}>Order #{order.id} — {order.buyerName} — {order.status} — ${Number(order.totalAmount).toFixed(2)} — refund: {order.refundStatus}</p>)}
-      <h3>Platform refunds</h3>
-      {refunds.length === 0 ? <p>No refunds.</p> : refunds.map((refund) => (
-        <div key={refund.id}>
-          <p>Order #{refund.orderId} — {refund.buyerName} — {refund.reason} — {refund.status}</p>
-          {refund.status === "requested" && <><button type="button" onClick={() => decideRefund(refund.id, "approve")}>Approve Refund</button><button type="button" onClick={() => decideRefund(refund.id, "reject")}>Deny Refund</button></>}
-        </div>
-      ))}
-      </section>
+
+      <div className="admin-workspace">
+        <section className="panel admin-control-panel">
+          <div className="admin-section-heading"><div><p className="eyebrow">Moderation queue</p><h2>Book upload requests</h2></div><span className="pill">{listings.length} open</span></div>
+          {listings.length === 0 ? <p className="muted">No listing decisions are waiting.</p> : <div className="admin-queue">
+            {listings.map((listing) => <article className="admin-queue-item" key={listing.id}>
+              <div><strong>{listing.title}</strong><p className="muted">by {listing.sellerName} · ${Number(listing.price).toFixed(2)} · {listing.stock} in stock</p><small>ISBN {listing.isbn} {listing.isbnValid ? "· valid" : "· invalid"} {listing.flagged ? `· flagged: ${listing.matchedPhrases.join(", ")}` : ""}</small></div>
+              <div className="admin-action-row"><button type="button" onClick={() => reviewListing(listing.id, "approve")}>Approve</button><input aria-label={`Rejection reason for ${listing.title}`} placeholder="Rejection reason" value={reasons[listing.id] || ""} onChange={(event) => setReasons({ ...reasons, [listing.id]: event.target.value })} /><button className="danger" type="button" onClick={() => reviewListing(listing.id, "reject")}>Reject</button></div>
+            </article>)}
+          </div>}
+        </section>
+
+        <section className="panel admin-control-panel">
+          <div className="admin-section-heading"><div><p className="eyebrow">Customer care</p><h2>Refund command queue</h2></div><span className="pill">{openRefunds.length} open</span></div>
+          {openRefunds.length === 0 ? <p className="muted">No refund decisions are waiting.</p> : <div className="admin-queue">
+            {openRefunds.map((refund) => <article className="admin-queue-item" key={refund.id}><div><strong>Order #{refund.orderId}</strong><p className="muted">{refund.buyerEmail} · ${Number(refund.refundAmount).toFixed(2)} via {refund.refundMethod === "store_credit" ? "store credit" : "original payment"}</p><small>Reason: {refund.reason}</small></div><div className="admin-action-row"><button type="button" onClick={() => decideRefund(refund.id, "approve")}>Process refund</button><button className="danger" type="button" onClick={() => decideRefund(refund.id, "reject")}>Deny</button></div></article>)}
+          </div>}
+        </section>
+      </div>
+
+      <div className="admin-workspace">
+        <section className="panel admin-control-panel">
+          <div className="admin-section-heading"><div><p className="eyebrow">Access governance</p><h2>Account approvals</h2></div></div>
+          {users.length === 0 ? <p className="muted">No accounts are waiting for approval.</p> : <div className="admin-queue">{users.map((user) => <article className="admin-queue-item" key={user.id}><div><strong>{user.fullName}</strong><p className="muted">{user.email} · {user.role}</p></div><div className="admin-action-row"><button type="button" onClick={() => changeUser(user.id, "approve")}>Approve account</button><button className="danger" type="button" onClick={() => changeUser(user.id, "disable")}>Disable</button></div></article>)}</div>}
+        </section>
+
+        <section className="panel admin-control-panel">
+          <div className="admin-section-heading"><div><p className="eyebrow">Trust tools</p><h2>Safety command set</h2></div><button className="secondary" type="button" onClick={rescan}>Run pending scan</button></div>
+          <form className="admin-phrase-form" onSubmit={addPhrase}><input required value={phrase} onChange={(event) => setPhrase(event.target.value)} placeholder="Add prohibited word or phrase" /><button type="submit">Add rule</button></form>
+          <div className="admin-tag-list">{words.map((word) => <span className="admin-tag" key={word.id}>{word.phrase}<button type="button" aria-label={`Remove ${word.phrase}`} onClick={() => removePhrase(word.id)}>×</button></span>)}</div>
+        </section>
+      </div>
     </main>
   );
 }

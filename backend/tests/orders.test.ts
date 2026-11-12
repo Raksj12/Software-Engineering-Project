@@ -134,7 +134,7 @@ test("Refund rejects missing orders", async () => {
     "POST",
     "/999999/refund",
     true,
-    { reason: "Damaged book" }
+    { reason: "Damaged book", refundMethod: "original_payment" }
   );
 
   assert.equal(response.status, 404);

@@ -1,9 +1,21 @@
 import { Router, type Request, type Response } from "express";
 import { pool } from "./db.js";
-import { createNotification } from "./notifications.js";
+import { createNotification, notifyAdmins } from "./notifications.js";
 import { isValidIsbn } from "./isbn.js";
 
 export const adminRouter = Router();
+
+adminRouter.get("/inbox", async (_req, res) => {
+  const result = await pool.query(
+    `SELECT id, message, is_read AS "isRead", created_at AS "createdAt"
+     FROM notifications
+     WHERE user_id = $1
+     ORDER BY created_at DESC
+     LIMIT 100`,
+    [_req.user!.id],
+  );
+  res.json({ messages: result.rows });
+});
 
 async function logAction(adminId: number, action: string, targetType: string, targetId: number, details?: string) {
   await pool.query(
@@ -232,7 +244,8 @@ adminRouter.get("/orders", async (req, res) => {
 adminRouter.get("/refunds", async (_req, res) => {
   const result = await pool.query(
     `SELECT rr.id, rr.order_id AS "orderId", rr.buyer_id AS "buyerId", u.email AS "buyerEmail",
-            rr.reason, rr.status, rr.reviewed_by AS "reviewedBy", rr.created_at AS "createdAt"
+            rr.reason, rr.refund_method AS "refundMethod", rr.refund_amount AS "refundAmount",
+            rr.status, rr.reviewed_by AS "reviewedBy", rr.created_at AS "createdAt"
      FROM refund_requests rr JOIN users u ON u.id=rr.buyer_id ORDER BY rr.created_at DESC`,
   );
   res.json({ refunds: result.rows });
@@ -242,18 +255,75 @@ adminRouter.post("/refunds/:id/:decision", async (req, res) => {
   const decision = req.params.decision === "approve" ? "approved" : req.params.decision === "reject" ? "rejected" : "";
   const id = Number(req.params.id);
   if (!decision || !Number.isInteger(id) || id < 1) { res.status(400).json({ error: "Invalid refund decision." }); return; }
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `SELECT rr.order_id AS "orderId", rr.buyer_id AS "buyerId", rr.refund_method AS "refundMethod",
+              rr.refund_amount AS "refundAmount"
+       FROM refund_requests rr WHERE rr.id=$1 AND rr.status='requested' FOR UPDATE`,
+      [id],
+    );
+    if (!result.rowCount) { await client.query("ROLLBACK"); res.status(409).json({ error: "Refund not found or already reviewed." }); return; }
+    const refund = result.rows[0];
+    const approved = decision === "approved";
+    await client.query(
+      `UPDATE refund_requests SET status=$1, reviewed_by=$2, reviewed_at=NOW(),
+       processed_at=CASE WHEN $1='completed' THEN NOW() ELSE processed_at END
+       WHERE id=$3`,
+      [approved ? "completed" : "rejected", req.user!.id, id],
+    );
+    if (approved) {
+      await client.query(
+        "UPDATE orders SET refund_status='completed', status='refunded', refunded_at=NOW(), updated_at=NOW() WHERE id=$1",
+        [refund.orderId],
+      );
+      if (refund.refundMethod === "store_credit") {
+        await client.query("UPDATE users SET store_credit=store_credit+$1, updated_at=NOW() WHERE id=$2", [refund.refundAmount, refund.buyerId]);
+      }
+    } else {
+      await client.query("UPDATE orders SET refund_status='rejected', updated_at=NOW() WHERE id=$1", [refund.orderId]);
+    }
+    await client.query("COMMIT");
+    const sellers = await pool.query("SELECT DISTINCT seller_id AS \"sellerId\" FROM order_items WHERE order_id=$1", [refund.orderId]);
+    const destination = refund.refundMethod === "store_credit" ? "store credit" : "the original payment method";
+    await createNotification(refund.buyerId, `Refund for order #${refund.orderId} was ${approved ? `processed to ${destination}` : "rejected"}.`);
+    if (approved) {
+      for (const seller of sellers.rows) await createNotification(seller.sellerId, `Refund for order #${refund.orderId} was processed and fulfilled.`);
+      await notifyAdmins(`Refund for order #${refund.orderId} was processed and fulfilled by an administrator.`);
+    }
+    await logAction(req.user!.id, `${decision}_refund`, "refund", id, destination);
+    res.json({ ok: true, status: approved ? "completed" : "rejected", refundMethod: refund.refundMethod });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
+adminRouter.patch("/orders/:id/status", async (req, res) => {
+  const id = parseId(req, res);
+  if (id === null) return;
+  const status = typeof req.body?.status === "string" ? req.body.status : "";
+  const allowed = ["paid", "processing", "shipped", "delivered", "cancelled", "refunded"];
+  if (!allowed.includes(status)) { res.status(400).json({ error: "Invalid order status." }); return; }
   const result = await pool.query(
-    `UPDATE refund_requests SET status=$1, reviewed_by=$2, reviewed_at=NOW()
-     WHERE id=$3 AND status='requested' RETURNING order_id AS "orderId", buyer_id AS "buyerId"`,
-    [decision, req.user!.id, id],
+    `UPDATE orders SET status=$1, updated_at=NOW()
+     WHERE id=$2 RETURNING buyer_id AS "buyerId", id, status`,
+    [status, id],
   );
-  if (!result.rowCount) { res.status(409).json({ error: "Refund not found or already reviewed." }); return; }
-  await pool.query(
-    `UPDATE orders SET refund_status=$1, status=CASE WHEN $1='approved' THEN 'refunded' ELSE status END,
-     refunded_at=CASE WHEN $1='approved' THEN NOW() ELSE refunded_at END, updated_at=NOW() WHERE id=$2`,
-    [decision, result.rows[0].orderId],
+  if (!result.rowCount) { res.status(404).json({ error: "Order not found." }); return; }
+  await createNotification(result.rows[0].buyerId, `An administrator updated order #${id} to ${status}.`);
+  await logAction(req.user!.id, "override_order_status", "order", id, status);
+  res.json({ order: result.rows[0] });
+});
+
+adminRouter.get("/earnings", async (_req, res) => {
+  const result = await pool.query(
+    `SELECT COALESCE(SUM(oi.quantity * oi.unit_price) FILTER (WHERE o.status NOT IN ('cancelled','refunded')), 0) AS "grossSales",
+            COUNT(DISTINCT o.id) FILTER (WHERE o.status NOT IN ('cancelled','refunded')) AS "orderCount"
+     FROM orders o JOIN order_items oi ON oi.order_id=o.id`,
   );
-  await createNotification(result.rows[0].buyerId, `Refund request for order #${result.rows[0].orderId} was ${decision}.`);
-  await logAction(req.user!.id, `${decision}_refund`, "refund", id);
-  res.json({ ok: true, status: decision });
+  res.json(result.rows[0]);
 });
