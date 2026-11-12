@@ -28,7 +28,7 @@ async function fetchRole(): Promise<Role | null> {
 }
 
 // Nav link and logo target: each role's own homepage
-export function HomeLink({ className, children }: { className?: string; children: React.ReactNode }) {
+export function HomeLink({ className, children }: { className?: string; children: ReactNode }) {
   const [role, setRole] = useState<Role | null>(null);
   const location = useLocation();
 
