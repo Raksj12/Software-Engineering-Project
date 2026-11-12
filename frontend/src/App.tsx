@@ -15,6 +15,7 @@ import OrderHistory from "./Buyer/OrderHistory";
 import SellerHome from "./Seller/SellerHome";
 import AdminHome from "./Admin/AdminHome";
 import Notifications from "./Notifications/Notifications";
+import RoleHome, { HomeLink } from "./Home/Home";
 
 type Role = "buyer" | "seller" | "admin";
 
@@ -98,11 +99,12 @@ function NotFound() {
 
 function App() {
   return (
-    <BrowserRouter>
+  <BrowserRouter>
       <div className="app-shell">
         <header className="site-header">
-          <Link className="brand" to="/login">Book<span>Haven</span></Link>
+          <HomeLink className="brand">Book<span>Haven</span></HomeLink>
           <nav className="site-nav" aria-label="Main navigation">
+            <HomeLink>Home</HomeLink>
             <Link to="/buyer">Browse</Link>
             <Link to="/buyer/cart">Cart</Link>
             <Link to="/buyer/orders">Orders</Link>
@@ -114,7 +116,7 @@ function App() {
         </header>
 
         <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/" element={<RoleHome />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/profile" element={<ProtectedPage roles={["buyer", "seller", "admin"]}><Profile /></ProtectedPage>} />
