@@ -114,7 +114,7 @@ function BookDetails() {
           <h3>Details</h3>
           <p className="muted">ISBN: {book.isbn}</p>
           <h3>Reviews</h3>
-          <p className="pill">★ {averageRating === null ? "No ratings yet" : `${averageRating.toFixed(1)}/5 (${reviews.length} ${reviews.length === 1 ? "review" : "reviews"})`}</p></p>
+          <p className="pill">★ {averageRating === null ? "No ratings yet" : `${averageRating.toFixed(1)}/5 (${reviews.length} ${reviews.length === 1 ? "review" : "reviews"})`}</p>
           {reviews.length === 0 ? <p>No reviews yet.</p> : reviews.map((review) => (
             <div className="panel form-card" key={review.id}>
               <p>{review.rating}/5 by {review.buyerName}</p>
