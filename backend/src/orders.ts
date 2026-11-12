@@ -5,6 +5,7 @@ import { createNotification, notifyAdmins } from "./notifications.js";
 export const ordersRouter = Router();
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
+const REFUND_WINDOW_DAYS = Number(process.env.REFUND_WINDOW_DAYS) || 30;
 const TAX_RATES: Record<string, number> = {
   AL: 0.04, AK: 0, AZ: 0.056, AR: 0.065, CA: 0.0725, CO: 0.029, CT: 0.0635, DE: 0,
   FL: 0.06, GA: 0.04, HI: 0.04, ID: 0.06, IL: 0.0625, IN: 0.07, IA: 0.06, KS: 0.065,
@@ -97,12 +98,17 @@ ordersRouter.post("/:orderId/refund", async (req, res) => {
      SELECT id,buyer_id,$3,$4,total_amount FROM orders
      WHERE id=$1 AND buyer_id=$2 AND status IN ('paid','processing','shipped','delivered')
        AND refund_status='none'
+       AND created_at > NOW() - make_interval(days => $5::int)
      RETURNING id, order_id AS "orderId", status, reason, created_at AS "createdAt"`,
-    [orderId, req.user!.id, reason, refundMethod],
+    [orderId, req.user!.id, reason, refundMethod, REFUND_WINDOW_DAYS],
   );
   if (!result.rowCount) {
-    const existing = await pool.query("SELECT buyer_id, refund_status, status FROM orders WHERE id=$1", [orderId]);
+    const existing = await pool.query("SELECT buyer_id, refund_status, status, created_at FROM orders WHERE id=$1", [orderId]);
     if (!existing.rowCount || existing.rows[0].buyer_id !== req.user!.id) { res.status(404).json({ error: "Order not found." }); return; }
+    const ageDays = (Date.now() - new Date(existing.rows[0].created_at).getTime()) / 86400000;
+    if (ageDays > REFUND_WINDOW_DAYS && existing.rows[0].refund_status === "none") {
+      res.status(400).json({ error: `Refund requests must be made within ${REFUND_WINDOW_DAYS} days of the order.` }); return;
+    }
     res.status(409).json({ error: "This order is not eligible or already has a refund request." }); return;
   }
   await pool.query("UPDATE orders SET refund_status='requested', refund_reason=$2, updated_at=NOW() WHERE id=$1", [orderId, reason]);
