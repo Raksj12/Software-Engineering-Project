@@ -9,6 +9,8 @@ type Order = {
   createdAt: string;
   items: { title: string; quantity: number; unitPrice: string }[];
   refundStatus?: string | null;
+  cardBrand?: string | null;
+  cardLast4?: string | null;
 };
 type BuyerAccount = { storeCredit: string };
 
@@ -83,6 +85,7 @@ function OrderHistory() {
           <div className="page-heading"><div><h3>Order #{order.id}</h3><p className="muted">Placed {new Date(order.createdAt).toLocaleString()}</p></div><span className="pill">{order.status}</span></div>
           <p className="price">${Number(order.totalAmount).toFixed(2)}</p>
           <p className="muted">Shipping to: {order.shippingAddress}</p>
+          {order.cardLast4 && <p className="muted">Paid with {order.cardBrand || "card"} ending in {order.cardLast4}</p>}
           <ul>{order.items.map((item) => <li key={item.title}>{item.quantity} x {item.title} (${Number(item.unitPrice).toFixed(2)})</li>)}</ul>
           {(!order.refundStatus || order.refundStatus === "none") && !["cancelled", "refunded"].includes(order.status) && (
             <>

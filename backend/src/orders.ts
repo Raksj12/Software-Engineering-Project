@@ -77,6 +77,7 @@ ordersRouter.get("/", async (req, res) => {
   const result = await pool.query(
     `SELECT o.id, o.status, o.total_amount AS "totalAmount", o.shipping_address AS "shippingAddress",
             o.refund_status AS "refundStatus", o.refund_reason AS "refundReason", o.created_at AS "createdAt",
+            o.card_last4 AS "cardLast4", o.card_brand AS "cardBrand",
             COALESCE(json_agg(json_build_object('productId', oi.product_id, 'title', p.title,
               'quantity', oi.quantity, 'unitPrice', oi.unit_price, 'fulfillmentStatus', oi.fulfillment_status))
               FILTER (WHERE oi.product_id IS NOT NULL), '[]') AS items
@@ -143,8 +144,8 @@ ordersRouter.patch("/:orderId", async (req, res) => {
   res.json({ order: result.rows[0], message: "Order shipping address updated." });
 });
 
-// Basic format checks only. Real card validation and a payment gateway come later.
-// Card details are never stored.
+// Simulated payment gateway: format and expiry checks only. No real charge is made.
+// The full card number, expiry, and CVV are never stored. Only the brand and last four digits are kept.
 function cardError(card: Record<string, unknown>): string | null {
   const name = text(card.name);
   const number = text(card.number).replace(/[\s-]/g, "");
@@ -155,7 +156,29 @@ function cardError(card: Record<string, unknown>): string | null {
   if (!/^\d{12,19}$/.test(number)) return "Card number must be 12 to 19 digits.";
   if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(expiry)) return "Expiry must be in MM/YY format.";
   if (!/^\d{3,4}$/.test(cvv)) return "CVV must be 3 or 4 digits.";
+
+  // A card is valid through the end of its expiry month
+  const month = Number(expiry.slice(0, 2));
+  const year = 2000 + Number(expiry.slice(3, 5));
+  const now = new Date();
+  if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) {
+    return "Card has expired.";
+  }
   return null;
+}
+
+// Card network, detected from the first digits of the number
+function cardBrand(card: Record<string, unknown>): string {
+  const number = text(card.number).replace(/[\s-]/g, "");
+  if (/^4/.test(number)) return "Visa";
+  if (/^(5[1-5]|2[2-7])/.test(number)) return "Mastercard";
+  if (/^3[47]/.test(number)) return "American Express";
+  if (/^6/.test(number)) return "Discover";
+  return "Card";
+}
+
+function cardLast4(card: Record<string, unknown>): string {
+  return text(card.number).replace(/[\s-]/g, "").slice(-4);
 }
 
 // Buy now: one book, paid immediately
@@ -216,9 +239,9 @@ ordersRouter.post("/", async (req, res) => {
     const total = subtotal + taxAmount;
 
     const order = await client.query(
-      `INSERT INTO orders (buyer_id, status, total_amount, shipping_address, tax_state, tax_rate, tax_amount, ip_address)
-       VALUES ($1, 'paid', $2, $3, $4, $5, $6, $7) RETURNING id, created_at AS "createdAt"`,
-      [req.user!.id, total, shippingAddress, taxState, taxRate, taxAmount, clientIp(req)],
+      `INSERT INTO orders (buyer_id, status, total_amount, shipping_address, tax_state, tax_rate, tax_amount, ip_address, card_last4, card_brand)
+       VALUES ($1, 'paid', $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at AS "createdAt"`,
+      [req.user!.id, total, shippingAddress, taxState, taxRate, taxAmount, clientIp(req), cardLast4(body.card ?? {}), cardBrand(body.card ?? {})],
     );
     const orderId = order.rows[0].id;
 
@@ -310,13 +333,18 @@ ordersRouter.post("/checkout", async (req, res) => {
     const availableCredit = Number(account.rows[0]?.store_credit || 0);
     const storeCreditApplied = useStoreCredit ? Math.min(availableCredit, total) : 0;
     const paymentAmount = Number((total - storeCreditApplied).toFixed(2));
+    let savedLast4: string | null = null;
+    let savedBrand: string | null = null;
     if (paymentAmount > 0) {
-      const invalidCard = cardError(req.body?.card ?? {});
+      const card = req.body?.card ?? {};
+      const invalidCard = cardError(card);
       if (invalidCard) {
         await client.query("ROLLBACK");
         res.status(400).json({ error: invalidCard });
         return;
       }
+      savedLast4 = cardLast4(card);
+      savedBrand = cardBrand(card);
     }
     if (storeCreditApplied > 0) {
       await client.query(
@@ -326,10 +354,10 @@ ordersRouter.post("/checkout", async (req, res) => {
     }
     const order = await client.query(
       `INSERT INTO orders (buyer_id, status, total_amount, shipping_address, tax_state, tax_rate, tax_amount, ip_address,
-                           store_credit_applied, payment_amount)
-       VALUES ($1, 'paid', $2, $3, $4, $5, $6, $7, $8, $9)
+                           store_credit_applied, payment_amount, card_last4, card_brand)
+       VALUES ($1, 'paid', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id, created_at AS "createdAt"`,
-      [req.user!.id, total, shippingAddress, taxState, taxRate, taxAmount, clientIp(req), storeCreditApplied, paymentAmount],
+      [req.user!.id, total, shippingAddress, taxState, taxRate, taxAmount, clientIp(req), storeCreditApplied, paymentAmount, savedLast4, savedBrand],
     );
 
     for (const item of cart.rows) {
