@@ -183,3 +183,10 @@ INSERT INTO genres (name) VALUES
   ('Mystery'), ('Romance'), ('Non-Fiction'), ('Biography'),
   ('History'), ('Children')
 ON CONFLICT (name) DO NOTHING;
+
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_last4 TEXT;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_brand TEXT;
+
+ALTER TABLE order_items DROP CONSTRAINT IF EXISTS order_items_fulfillment_status_check;
+ALTER TABLE order_items ADD CONSTRAINT order_items_fulfillment_status_check
+  CHECK (fulfillment_status IN ('pending', 'processing', 'shipped', 'delivered', 'cancelled'));

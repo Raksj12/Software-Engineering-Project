@@ -13,7 +13,7 @@ type Listing = {
   status: string;
   rejectionReason: string | null;
 };
-type Sale = { orderId: number; productId: number; title: string; quantity: number; fulfillmentStatus: string; carrier: string | null; trackingNumber: string | null };
+type Sale = { orderId: number; productId: number; title: string; quantity: number; fulfillmentStatus: string; carrier: string | null; trackingNumber: string | null; paymentStatus?: string; refundStatus?: string };
 type Refund = { id: number; orderId: number; buyerName: string; reason: string; status: string; refundMethod?: string; refundAmount?: string };
 type EarningsLine = { title: string; itemsSold: number; grossSales: string; orderCount: number };
 
@@ -105,7 +105,7 @@ function SellerHome() {
     }).catch(() => setListMessage("Could not load sales or refund requests."));
   }, []);
 
-  async function updateSale(sale: Sale, action: "process" | "ship" | "cancel") {
+  async function updateSale(sale: Sale, action: "process" | "ship" | "cancel" | "deliver") {
     const token = sessionStorage.getItem("authToken");
     const body = action === "ship" ? { carrier: "USPS", trackingNumber: "DEMO123456" } : action === "cancel" ? { reason: "Unable to fulfill" } : {};
     const response = await fetch(`http://localhost:3000/api/seller/orders/${sale.orderId}/items/${sale.productId}/${action}`, {
@@ -320,7 +320,30 @@ function SellerHome() {
       </section>
       <section className="panel seller-control-panel">
         <div className="seller-section-heading"><div><p className="eyebrow">Operations</p><h2>Fulfillment queue</h2></div><span className="pill">{pendingSales} pending</span></div>
-        {sales.length === 0 ? <p className="muted">No sales yet.</p> : <div className="seller-queue">{sales.map((sale) => <article className="seller-queue-item" key={`${sale.orderId}-${sale.productId}`}><div><strong>Order #{sale.orderId} · {sale.title}</strong><p className="muted">{sale.quantity} copy/copies · {sale.fulfillmentStatus}</p></div><div className="seller-action-row">{sale.fulfillmentStatus === "pending" && <button type="button" onClick={() => updateSale(sale, "process")}>Process</button>}{sale.fulfillmentStatus === "processing" && <button type="button" onClick={() => updateSale(sale, "ship")}>Mark shipped</button>}{["pending", "processing"].includes(sale.fulfillmentStatus) && <button className="danger" type="button" onClick={() => updateSale(sale, "cancel")}>Cancel</button>}</div></article>)}</div>}
+        {sales.length === 0 ? <p className="muted">No sales yet.</p> : (
+          <div className="seller-queue">
+            {sales.map((sale) => {
+              const locked = ["refunded", "cancelled"].includes(sale.paymentStatus || "") || ["requested", "completed"].includes(sale.refundStatus || "");
+              return (
+                <article className="seller-queue-item" key={`${sale.orderId}-${sale.productId}`}>
+                  <div>
+                    <strong>Order #{sale.orderId} · {sale.title}</strong>
+                    <p className="muted">{sale.quantity} copy/copies · {sale.fulfillmentStatus}</p>
+                    {locked && <small>{sale.refundStatus === "requested" ? "Refund requested: decide the refund before fulfilling." : "Refunded or cancelled: no further fulfillment."}</small>}
+                  </div>
+                  {!locked && (
+                    <div className="seller-action-row">
+                      {sale.fulfillmentStatus === "pending" && <button type="button" onClick={() => updateSale(sale, "process")}>Process</button>}
+                      {sale.fulfillmentStatus === "processing" && <button type="button" onClick={() => updateSale(sale, "ship")}>Mark shipped</button>}
+                      {sale.fulfillmentStatus === "shipped" && <button type="button" onClick={() => updateSale(sale, "deliver")}>Mark delivered</button>}
+                      {["pending", "processing"].includes(sale.fulfillmentStatus) && <button className="danger" type="button" onClick={() => updateSale(sale, "cancel")}>Cancel</button>}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
       <section className="panel seller-control-panel">
         <div className="seller-section-heading"><div><p className="eyebrow">Customer care</p><h2>Refund requests</h2></div><span className="pill">{openRefunds} open</span></div>
