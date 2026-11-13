@@ -68,6 +68,21 @@ function BookDetails() {
     if (response.ok) window.dispatchEvent(new Event("cart-changed"));
   }
 
+  async function addToWishlist() {
+    const token = sessionStorage.getItem("authToken");
+    try {
+      const response = await fetch("http://localhost:3000/api/wishlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ productId: Number(id) }),
+      });
+      const data = await response.json();
+      setMessage(response.ok ? `${book?.title || "Book"} was added to your wishlist.` : data.error || "Could not add book to wishlist.");
+    } catch {
+      setMessage("Could not connect to the server. Your wishlist was not changed.");
+    }
+  }
+
   return (
     <main className="page">
       {message && message !== "Loading..." && (
@@ -105,6 +120,7 @@ function BookDetails() {
                 />
               </label>
               <button className="secondary" type="button" onClick={addToCart}>Add to Cart</button>
+              <button className="secondary" type="button" onClick={addToWishlist}>Add to Wishlist</button>
             </div>
           )}
 
@@ -114,7 +130,7 @@ function BookDetails() {
           <h3>Details</h3>
           <p className="muted">ISBN: {book.isbn}</p>
           <h3>Reviews</h3>
-          <p className="pill">★ {averageRating === null ? "No ratings yet" : `${averageRating.toFixed(1)}/5`}</p>
+          <p className="pill">★ {averageRating === null ? "No ratings yet" : `${averageRating.toFixed(1)}/5 (${reviews.length} ${reviews.length === 1 ? "review" : "reviews"})`}</p>
           {reviews.length === 0 ? <p>No reviews yet.</p> : reviews.map((review) => (
             <div className="panel form-card" key={review.id}>
               <p>{review.rating}/5 by {review.buyerName}</p>

@@ -63,6 +63,11 @@ searchRouter.get("/compare", async (req, res) => {
   res.json({ products: result.rows });
 });
 
+searchRouter.get("/genres", async (_req, res) => {
+  const result = await pool.query("SELECT name FROM genres ORDER BY name");
+  res.json({ genres: result.rows.map((row) => row.name) });
+});
+
 searchRouter.get("/:id", async (req, res) => {
   const id = Number(req.params.id);
   if (!Number.isInteger(id) || id < 1) {
