@@ -7,6 +7,7 @@ type Listing = {
   isbn: string;
   genre: string;
   condition: string;
+  description: string;
   price: string;
   stock: number;
   imagePath: string | null;
@@ -23,6 +24,28 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: "Rejected",
   archived: "Disabled by admin",
 };
+
+// REQ-010 / REQ-011: editable listing fields. Changing any MATERIAL_FIELDS sends a published or
+// rejected listing back to admin review; the backend makes the final decision.
+type ListingDraft = { title: string; author: string; isbn: string; genre: string; condition: string; description: string; price: string; stock: string };
+const MATERIAL_FIELDS = ["title", "author", "description", "isbn"] as const;
+const MATERIAL_LABELS: Record<(typeof MATERIAL_FIELDS)[number], string> = { title: "title", author: "author", description: "description", isbn: "ISBN" };
+
+function toDraft(listing: Listing): ListingDraft {
+  return {
+    title: listing.title, author: listing.author, isbn: listing.isbn || "", genre: listing.genre || "",
+    condition: listing.condition || "new", description: listing.description || "",
+    price: Number(listing.price).toFixed(2), stock: String(listing.stock),
+  };
+}
+
+// Which material fields differ from the saved listing (ISBN hyphens and spaces are ignored, as on the server)
+function materialChanges(listing: Listing, draft: ListingDraft): string[] {
+  const normalize = (field: (typeof MATERIAL_FIELDS)[number], value: string) =>
+    field === "isbn" ? value.replace(/[-\s]/g, "") : value.trim();
+  const saved = toDraft(listing);
+  return MATERIAL_FIELDS.filter((field) => normalize(field, draft[field]) !== normalize(field, saved[field])).map((field) => MATERIAL_LABELS[field]);
+}
 
 function isValidPrice(value: string): boolean {
   return /^\d+(\.\d{1,2})?$/.test(value.trim()) && Number(value) > 0;
@@ -65,6 +88,10 @@ function SellerHome() {
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [earnings, setEarnings] = useState<{ grossSales: string; itemsSold: number; orderCount: number } | null>(null);
   const [earningsBreakdown, setEarningsBreakdown] = useState<EarningsLine[]>([]);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ListingDraft | null>(null);
+  const [editMessage, setEditMessage] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     fetchMyListings()
@@ -122,6 +149,47 @@ function SellerHome() {
     const data = await response.json();
     setListMessage(data.error || (response.ok ? "Refund request updated." : "Could not update refund."));
     if (response.ok) setRefunds((await fetch("http://localhost:3000/api/seller/orders/refunds", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())).refunds);
+  }
+
+  function startEdit(listing: Listing) {
+    setEditingId(listing.id);
+    setDraft(toDraft(listing));
+    setEditMessage("");
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setDraft(null);
+    setEditMessage("");
+  }
+
+  async function saveEdit(event: React.FormEvent<HTMLFormElement>, listing: Listing) {
+    event.preventDefault();
+    if (!draft) return;
+    if (!isValidPrice(draft.price)) {
+      setEditMessage("Enter a valid price greater than 0 with no more than two decimal places (for example, 12.99).");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const response = await fetch(`http://localhost:3000/api/seller/listings/${listing.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionStorage.getItem("authToken")}` },
+        body: JSON.stringify({ ...draft, stock: Number(draft.stock) }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setEditMessage(data.error || "Could not save your changes.");
+        return;
+      }
+      cancelEdit();
+      setMessage(data.message || "Listing updated.");
+      setListings(await fetchMyListings());
+    } catch {
+      setEditMessage("Could not connect to the server.");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
@@ -307,15 +375,66 @@ function SellerHome() {
 
       <h3 className="seller-subheading">My listings</h3>
       <ul className="seller-list">
-        {listings.map((listing) => (
-          <li className="seller-list-item" key={listing.id}>
-            <div><strong>{listing.title}</strong><p className="muted">{listing.author} · ${Number(listing.price).toFixed(2)} · {listing.stock} in stock</p></div>
-            <span className="pill">{STATUS_LABELS[listing.status] || listing.status}</span>
-            {listing.status === "rejected" && listing.rejectionReason && (
-              <small>Reason: {listing.rejectionReason}</small>
-            )}
-          </li>
-        ))}
+        {listings.map((listing) => {
+          if (editingId === listing.id && draft) {
+            const changes = materialChanges(listing, draft);
+            const willBeReviewed = changes.length > 0 && ["approved", "rejected"].includes(listing.status);
+            const update = (field: keyof ListingDraft) =>
+              (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+                setDraft({ ...draft, [field]: event.target.value });
+            return (
+              <li className="seller-list-item seller-edit-item" key={listing.id}>
+                <form onSubmit={(event) => saveEdit(event, listing)} aria-label={`Edit ${listing.title}`}>
+                  <strong>Edit listing</strong>
+                  <label>Title<input value={draft.title} onChange={update("title")} required /></label>
+                  <label>Author<input value={draft.author} onChange={update("author")} required /></label>
+                  <label>ISBN-10 or ISBN-13<input value={draft.isbn} onChange={update("isbn")} required /></label>
+                  <label>Genre
+                    <select value={draft.genre} onChange={update("genre")} required>
+                      <option value="">Select a genre</option>
+                      {genreOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  </label>
+                  <label>Condition
+                    <select value={draft.condition} onChange={update("condition")}>
+                      <option value="new">New</option>
+                      <option value="used">Used</option>
+                    </select>
+                  </label>
+                  <label>Description<textarea value={draft.description} onChange={update("description")} required /></label>
+                  <div className="seller-edit-row">
+                    <label>Price<input type="number" min="0.01" step="0.01" value={draft.price} onChange={update("price")} required /></label>
+                    <label>Stock<input type="number" min="0" step="1" value={draft.stock} onChange={update("stock")} required /></label>
+                  </div>
+                  {willBeReviewed ? (
+                    <small role="status">Changing the {changes.join(", ")} sends this listing back to admin review. It will be hidden from buyers until it is approved again.</small>
+                  ) : (
+                    <p className="muted">Price, stock, genre, and condition changes take effect immediately.</p>
+                  )}
+                  {editMessage && <p className="status-message">{editMessage}</p>}
+                  <div className="seller-action-row">
+                    <button type="submit" disabled={savingEdit}>{savingEdit ? "Saving..." : willBeReviewed ? "Save and resubmit" : "Save changes"}</button>
+                    <button className="secondary" type="button" onClick={cancelEdit}>Cancel</button>
+                  </div>
+                </form>
+              </li>
+            );
+          }
+          return (
+            <li className="seller-list-item" key={listing.id}>
+              <div><strong>{listing.title}</strong><p className="muted">{listing.author} · ${Number(listing.price).toFixed(2)} · {listing.stock} in stock</p></div>
+              <div className="seller-action-row">
+                <span className="pill">{STATUS_LABELS[listing.status] || listing.status}</span>
+                {listing.status !== "archived" && (
+                  <button className="secondary" type="button" onClick={() => startEdit(listing)} disabled={editingId !== null}>Edit</button>
+                )}
+              </div>
+              {listing.status === "rejected" && listing.rejectionReason && (
+                <small>Reason: {listing.rejectionReason}</small>
+              )}
+            </li>
+          );
+        })}
       </ul>
       </section>
       <section className="panel seller-control-panel">

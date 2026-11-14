@@ -110,7 +110,8 @@ overrides the selected state.
 \begin{itemize}
 \item A buyer may submit a refund request for an eligible order and must provide
 a reason.
-\item Each seller associated with the order receives an in-app notification.
+\item Each seller associated with the order receives an in-app notification
+naming only that seller's items; sellers not on the order are not notified.
 \item Sellers and administrators may approve or reject refund requests.
 \item Buyers receive an in-app notification after the decision.
 \item The local order and refund status is updated. No external payment refund
@@ -190,12 +191,7 @@ role-specific supervision inboxes and buyer notifications.
 \textbf{ID} & \textbf{Requirement} & \textbf{Current limitation}\\
 \midrule
 REQ-006 & Profile maintenance & Password changes and the seller store-name workflow are incomplete.\\
-REQ-010 & Re-review edited listings & Full automatic re-review behavior for every materially edited field is incomplete.\\
 REQ-024 & Grouped genre browsing & Genre filtering exists, but a dedicated grouped browse interface is not implemented.\\
-REQ-030 & Itemized pre-payment review & Checkout does not yet provide a separate complete order-summary step before submission.\\
-REQ-035 & Refund expiration & No configurable return/refund eligibility window is enforced.\\
-REQ-043 & Seller cancellation refund & Local refund state is supported, but no real provider refund is issued.\\
-REQ-052 & Review display & Individual reviews are available, but average-rating calculation is incomplete.\\
 REQ-064 & Role inboxes & Admin, seller, and buyer inboxes are implemented with unread navigation badges and read-state updates; browser fixture coverage remains pending.\\
 REQ-066 & Buyer store credit & Buyers can view their current store-credit balance and choose store credit or original payment as the refund destination.\\
 \bottomrule
@@ -437,13 +433,25 @@ credit applied and remaining amount due by card.
 \item The checkout summary lists each item, quantity, unit price, line total,
 subtotal, tax state, tax rate, tax amount, store credit applied, and amount
 due before submission.
-\item The buyer enters development card-format information.
-\item The buyer submits the order.
+\item The buyer enters development card-format information and selects Review
+order. The system validates the address and card format before continuing.
+\item On a separate review step, the system shows the itemized summary, the
+shipping address, the tax state, and the payment split (store credit and the
+card's last four digits). Nothing is charged at this point.
+\item The buyer either returns to edit their details or selects Place order.
+\item The system places the order only if the total still matches the total
+the buyer reviewed.
 \end{enumerate}
 
-\textit{Status note:} The checkout provides a persistent itemized order summary
-with subtotal, state tax, store credit applied, and remaining amount due before
-submission.
+\textit{Alternate flows:}
+\begin{itemize}
+\item Items that are no longer available or lack enough stock are flagged in
+the summary, and the buyer cannot continue until the cart is updated.
+\item If the total changed after review (for example, a price changed), the
+order is refused with nothing charged, and the review step shows the updated
+summary.
+\item An empty cart shows an empty-cart message instead of the checkout form.
+\end{itemize}
 
 \subsection{User Story 9 --- Calculate state tax}
 \textbf{As a buyer,} I want the checkout tax to reflect my selected state so
@@ -536,7 +544,8 @@ buyer dashboard and Order History.
 non-empty reason, and refund destination.
 \item The system creates a refund request and marks the local order refund
 status as requested.
-\item The system notifies every seller associated with the order.
+\item In the same transaction as the request, the system notifies every seller
+associated with the order, naming that seller's items.
 \item The buyer receives a request confirmation.
 \end{enumerate}
 
@@ -546,7 +555,8 @@ status as requested.
 \item A nonexistent order returns Not Found.
 \item An order belonging to another buyer cannot be used.
 \item A duplicate or ineligible request is rejected.
-\item A configurable time-based return window is a deferred enhancement.
+\item A request made more than REFUND\_WINDOW\_DAYS (default 30) days after the
+order was placed is rejected.
 \end{itemize}
 
 \subsection{User Story 13 --- Receive a refund decision}
@@ -585,7 +595,9 @@ and has not already reviewed it.
 \item The system checks authentication, purchase, delivery, duplicate status,
 rating range, and prohibited content.
 \item The system stores the valid review.
-\item The product page displays the review.
+\item The product page displays the review with the other reviews (newest
+first), beneath the book's average rating to one decimal place and its review
+count. A book with no reviews shows that it has no ratings yet.
 \end{enumerate}
 
 \textit{Alternate flows:}
@@ -594,7 +606,6 @@ rating range, and prohibited content.
 \item A duplicate review is rejected.
 \item A missing or out-of-range rating is rejected.
 \item Prohibited content is rejected with an explanation.
-\item Average-rating calculation remains a partial enhancement.
 \end{itemize}
 
 \subsection{User Story 15 --- Manage a wishlist}
@@ -663,8 +674,13 @@ and product information remain current.
 \textit{Alternate flows:}
 \begin{itemize}
 \item A seller cannot edit or remove another seller's listing.
-\item A materially changed listing should return to moderation; complete
-automatic re-review coverage remains partial.
+\item Changing the title, author, description, or ISBN of an approved or rejected
+listing returns it to pending review, clears any previous rejection reason,
+hides it from buyers (including at cart checkout), and notifies administrators
+with the changed fields. The edit form warns the seller before saving such a
+change.
+Price, stock, genre, and condition edits keep the listing live.
+\item An invalid ISBN checksum on edit is rejected and the listing is unchanged.
 \end{itemize}
 
 \subsection{User Story 20 --- View seller orders}
@@ -719,13 +735,25 @@ buyer is informed and the local order state is corrected.
 \begin{enumerate}
 \item The seller selects Cancel on an eligible unshipped order.
 \item The seller enters a cancellation reason.
-\item The system changes the local status to cancelled.
-\item The system records the local refund state where applicable.
-\item The buyer receives the cancellation reason.
+\item In one transaction, the system marks the seller's item cancelled, restocks
+it, and refunds the item price plus the order's tax rate. Store credit the buyer
+spent on the order is returned first; the remainder is recorded as a refund to
+the original payment method.
+\item When every item on the order is cancelled, the order becomes cancelled
+with a completed refund; otherwise the remaining items stay active.
+\item The buyer receives the cancellation reason and the refund amount and
+destination.
 \end{enumerate}
 
-\textit{Status note:} A real payment refund to the original payment method is
-deferred because no payment provider is connected.
+\textit{Alternate flows:}
+\begin{itemize}
+\item A shipped item, or another seller's item, cannot be cancelled.
+\item An order with an open buyer refund request cannot be cancelled until that
+request is approved or rejected.
+\end{itemize}
+
+\textit{Status note:} The original-payment portion is recorded locally; no real
+payment-provider refund is issued because no provider is connected.
 
 \subsection{User Story 23 --- Review seller earnings}
 \textbf{As a seller,} I want to see gross sales, items sold, order count, and

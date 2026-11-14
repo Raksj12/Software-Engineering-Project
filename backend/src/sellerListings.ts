@@ -41,21 +41,67 @@ sellerListingsRouter.patch("/:id", async (req, res) => {
   const title = text(body.title), author = text(body.author), genre = text(body.genre), description = text(body.description);
   const condition = text(body.condition).toLowerCase();
   const price = parsePrice(body.price), stock = Number(body.stock);
-  if (!title || !author || !genre || !description || !CONDITIONS.includes(condition) ||
-      price === null || !Number.isInteger(stock) || stock < 0) {
+  if (!title || !author || !genre || !description) {
+    res.status(400).json({ error: "Title, author, genre, and description are required." }); return;
+  }
+  if (!CONDITIONS.includes(condition)) { res.status(400).json({ error: "Condition must be new or used." }); return; }
+  if (price === null) {
     res.status(400).json({ error: "Enter a valid price greater than 0 with no more than two decimal places (for example, 12.99)." }); return;
   }
+  if (!Number.isInteger(stock) || stock < 0) { res.status(400).json({ error: "Stock must be a whole number of 0 or more." }); return; }
   const validGenre = await canonicalGenre(genre);
   if (!validGenre) { res.status(400).json({ error: "Please choose a genre from the list." }); return; }
+  // ISBN is optional on edit: leaving it out keeps the current one.
+  const isbnProvided = body.isbn !== undefined;
+  const isbn = isbnProvided ? text(body.isbn).replace(/[-\s]/g, "") : null;
+  if (isbnProvided && !isValidIsbn(isbn!)) {
+    res.status(400).json({ error: "Invalid ISBN. Enter a valid ISBN-10 or ISBN-13." }); return;
+  }
 
+  // REQ-010: a material edit (title, author, description, or ISBN) sends an approved or rejected listing back to
+  // pending review and clears any old rejection reason. Price, stock, and other edits keep the listing live.
+  // Changes are compared against the locked current row so the check and the update happen atomically.
   const result = await pool.query(
-    `UPDATE products SET title=$1, author=$2, genre=$3, description=$4, condition=$5, price=$6, stock=$7,
-       status=CASE WHEN status='approved' THEN 'pending' ELSE status END, updated_at=NOW()
-     WHERE id=$8 AND seller_id=$9 RETURNING ${LISTING_COLUMNS}`,
-    [title, author, validGenre, description, condition, price, stock, listingId, req.user!.id],
+    `WITH current AS (
+       SELECT id AS listing_id, status AS previous_status,
+              title IS DISTINCT FROM $1 AS title_changed,
+              author IS DISTINCT FROM $2 AS author_changed,
+              description IS DISTINCT FROM $4 AS description_changed,
+              ($10::text IS NOT NULL AND regexp_replace(COALESCE(isbn, ''), '[-[:space:]]', '', 'g') IS DISTINCT FROM $10)
+                AS isbn_changed
+       FROM products WHERE id=$8 AND seller_id=$9 FOR UPDATE
+     ), review AS (
+       SELECT *, previous_status IN ('approved', 'rejected') AND (title_changed OR author_changed OR description_changed OR isbn_changed)
+                   AS needs_review
+       FROM current
+     )
+     UPDATE products p SET title=$1, author=$2, genre=$3, description=$4, condition=$5, price=$6, stock=$7,
+       isbn=COALESCE($10, p.isbn),
+       status=CASE WHEN review.needs_review THEN 'pending' ELSE p.status END,
+       rejection_reason=CASE WHEN review.needs_review THEN NULL ELSE p.rejection_reason END,
+       updated_at=NOW()
+     FROM review WHERE p.id=review.listing_id
+     RETURNING ${LISTING_COLUMNS}, review.needs_review AS "sentForReview",
+       review.title_changed AS "titleChanged", review.author_changed AS "authorChanged",
+       review.description_changed AS "descriptionChanged",
+       review.isbn_changed AS "isbnChanged"`,
+    [title, author, validGenre, description, condition, price, stock, listingId, req.user!.id, isbn],
   );
   if (!result.rowCount) { res.status(404).json({ error: "Listing not found." }); return; }
-  res.json({ listing: result.rows[0] });
+  const { sentForReview, titleChanged, authorChanged, descriptionChanged, isbnChanged, ...listing } = result.rows[0];
+  if (!sentForReview) {
+    res.json({ listing, sentForReview: false, message: "Listing updated." });
+    return;
+  }
+  const fields = [titleChanged && "title", authorChanged && "author", descriptionChanged && "description", isbnChanged && "ISBN"]
+    .filter((field): field is string => Boolean(field));
+  const changed = fields.length > 1 ? `${fields.slice(0, -1).join(", ")} and ${fields[fields.length - 1]}` : fields[0];
+  await notifyAdmins(`Seller #${req.user!.id} changed the ${changed} of listing "${listing.title}"; it needs review again.`);
+  res.json({
+    listing,
+    sentForReview: true,
+    message: `Listing updated. Because the ${changed} changed, it is hidden from buyers until an admin reviews it again.`,
+  });
 });
 
 sellerListingsRouter.delete("/:id", async (req, res) => {

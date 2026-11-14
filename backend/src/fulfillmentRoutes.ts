@@ -113,9 +113,9 @@ fulfillmentRouter.get("/", async (req, res) => {
 
 fulfillmentRouter.get("/earnings", async (req, res) => {
   const result = await pool.query(
-    `SELECT COALESCE(SUM(oi.quantity * oi.unit_price) FILTER (WHERE o.status NOT IN ('cancelled','refunded')), 0) AS "grossSales",
-            COALESCE(SUM(oi.quantity) FILTER (WHERE o.status NOT IN ('cancelled','refunded')), 0) AS "itemsSold",
-            COUNT(DISTINCT o.id) FILTER (WHERE o.status NOT IN ('cancelled','refunded')) AS "orderCount"
+    `SELECT COALESCE(SUM(oi.quantity * oi.unit_price) FILTER (WHERE o.status NOT IN ('cancelled','refunded') AND oi.fulfillment_status <> 'cancelled'), 0) AS "grossSales",
+            COALESCE(SUM(oi.quantity) FILTER (WHERE o.status NOT IN ('cancelled','refunded') AND oi.fulfillment_status <> 'cancelled'), 0) AS "itemsSold",
+            COUNT(DISTINCT o.id) FILTER (WHERE o.status NOT IN ('cancelled','refunded') AND oi.fulfillment_status <> 'cancelled') AS "orderCount"
      FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE oi.seller_id=$1`,
     [req.user!.id],
   );
@@ -125,8 +125,8 @@ fulfillmentRouter.get("/earnings", async (req, res) => {
 fulfillmentRouter.get("/earnings/breakdown", async (req, res) => {
   const result = await pool.query(
     `SELECT p.title, SUM(oi.quantity) AS "itemsSold",
-            SUM(oi.quantity * oi.unit_price) FILTER (WHERE o.status NOT IN ('cancelled','refunded')) AS "grossSales",
-            COUNT(DISTINCT o.id) FILTER (WHERE o.status NOT IN ('cancelled','refunded')) AS "orderCount"
+            SUM(oi.quantity * oi.unit_price) FILTER (WHERE o.status NOT IN ('cancelled','refunded') AND oi.fulfillment_status <> 'cancelled') AS "grossSales",
+            COUNT(DISTINCT o.id) FILTER (WHERE o.status NOT IN ('cancelled','refunded') AND oi.fulfillment_status <> 'cancelled') AS "orderCount"
      FROM order_items oi
      JOIN orders o ON o.id=oi.order_id
      JOIN products p ON p.id=oi.product_id
@@ -177,8 +177,6 @@ async function moveItem(
     await pool.query("UPDATE orders SET status='processing', updated_at=NOW() WHERE id=$1 AND status IN ('paid','processing')", [orderId]);
   } else if (to === "shipped") {
     await pool.query("UPDATE orders SET status='shipped', updated_at=NOW() WHERE id=$1 AND status IN ('processing','paid')", [orderId]);
-  } else if (to === "cancelled") {
-    await pool.query("UPDATE orders SET status='cancelled', refund_status='completed', refunded_at=NOW(), updated_at=NOW() WHERE id=$1 AND status NOT IN ('shipped','delivered','refunded')", [orderId]);
   } else if (to === "delivered") {
     await pool.query("UPDATE orders SET status='delivered', updated_at=NOW() WHERE id=$1 AND status='shipped'", [orderId]);
   }
@@ -203,16 +201,112 @@ fulfillmentRouter.post("/:orderId/items/:productId/ship", async (req, res) => {
     (t) => `Your order for "${t}" has shipped via ${carrier}. Tracking: ${tracking}.`);
 });
 
-// pending/processing -> cancelled (reason required, not after shipping)
+const money = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
+
+// REQ-043: pending/processing -> cancelled (reason required, not after shipping).
+// Cancelling refunds only that item (price plus the order's tax rate), restocks it, and returns any store
+// credit the buyer spent before recording the rest as an original-payment refund (local stub, no provider).
+// The order itself becomes cancelled/refunded only once every item on it is cancelled.
 fulfillmentRouter.post("/:orderId/items/:productId/cancel", async (req, res) => {
   const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
   if (!reason) {
     res.status(400).json({ error: "A cancellation reason is required." });
     return;
   }
- 
-  await moveItem(req, res, ["pending", "processing"], "cancelled", { reason },
-    (t) => `Your order for "${t}" was cancelled: ${reason}`);
+  const orderId = Number(req.params.orderId);
+  const productId = Number(req.params.productId);
+  if (!Number.isInteger(orderId) || orderId < 1 || !Number.isInteger(productId) || productId < 1) {
+    res.status(400).json({ error: "Invalid order or product id." });
+    return;
+  }
+
+  const client = await pool.connect();
+  let conflict = "";
+  let outcome: { buyerId: number; title: string; amount: number; toCredit: number; toPayment: number; orderCancelled: boolean } | undefined;
+  try {
+    await client.query("BEGIN");
+    // Lock the order first so cancellations of sibling items on the same order compute refunds one at a time.
+    const orderResult = await client.query(
+      `SELECT buyer_id AS "buyerId", status, refund_status AS "refundStatus", total_amount AS "totalAmount",
+              tax_rate AS "taxRate", store_credit_applied AS "storeCreditApplied"
+       FROM orders WHERE id=$1 FOR UPDATE`,
+      [orderId],
+    );
+    const itemResult = await client.query(
+      `SELECT oi.quantity, oi.unit_price AS "unitPrice", oi.fulfillment_status AS "fulfillmentStatus", p.title
+       FROM order_items oi JOIN products p ON p.id=oi.product_id
+       WHERE oi.order_id=$1 AND oi.product_id=$2 AND oi.seller_id=$3
+       FOR UPDATE OF oi`,
+      [orderId, productId, req.user!.id],
+    );
+    const order = orderResult.rows[0];
+    const item = itemResult.rows[0];
+    if (!order || !item || ["pending", "cancelled", "refunded"].includes(order.status)
+      || !["pending", "processing"].includes(item.fulfillmentStatus)) {
+      conflict = "Order item not found, not yours, or not in a valid state for this action.";
+    } else if (["requested", "approved"].includes(order.refundStatus)) {
+      // Cancelling now would refund the same money twice once the open request is approved.
+      conflict = "This order has an open refund request. Approve or reject it instead of cancelling.";
+    } else {
+      const totals = await client.query(
+        `SELECT COALESCE(SUM(refund_amount), 0) AS refunded,
+                COUNT(*) FILTER (WHERE product_id <> $2 AND fulfillment_status <> 'cancelled') AS "otherActive"
+         FROM order_items WHERE order_id=$1`,
+        [orderId, productId],
+      );
+      const total = Number(order.totalAmount);
+      const alreadyRefunded = Number(totals.rows[0].refunded);
+      const orderCancelled = Number(totals.rows[0].otherActive) === 0;
+      const remaining = money(total - alreadyRefunded);
+      // The last item settles whatever is left of the order total, absorbing per-item tax rounding.
+      const amount = orderCancelled
+        ? Math.max(0, remaining)
+        : Math.max(0, Math.min(remaining, money(Number(item.quantity) * Number(item.unitPrice) * (1 + Number(order.taxRate)))));
+      const creditSpent = Number(order.storeCreditApplied);
+      const toCredit = money(Math.min(creditSpent, alreadyRefunded + amount) - Math.min(creditSpent, alreadyRefunded));
+      const toPayment = money(amount - toCredit);
+
+      await client.query(
+        `UPDATE order_items SET fulfillment_status='cancelled', cancel_reason=$3, refund_amount=$4, refunded_at=NOW()
+         WHERE order_id=$1 AND product_id=$2`,
+        [orderId, productId, reason, amount],
+      );
+      await client.query("UPDATE products SET stock=stock+$1, updated_at=NOW() WHERE id=$2", [item.quantity, productId]);
+      if (toCredit > 0) {
+        await client.query("UPDATE users SET store_credit=store_credit+$1, updated_at=NOW() WHERE id=$2", [toCredit, order.buyerId]);
+      }
+      await client.query(
+        orderCancelled
+          ? "UPDATE orders SET status='cancelled', refund_status='completed', refunded_at=NOW(), updated_at=NOW() WHERE id=$1"
+          : "UPDATE orders SET updated_at=NOW() WHERE id=$1",
+        [orderId],
+      );
+      outcome = { buyerId: Number(order.buyerId), title: item.title, amount, toCredit, toPayment, orderCancelled };
+    }
+    await client.query(conflict ? "ROLLBACK" : "COMMIT");
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+  if (!outcome) {
+    res.status(409).json({ error: conflict });
+    return;
+  }
+
+  const destinations = [
+    outcome.toCredit > 0 ? `$${outcome.toCredit.toFixed(2)} to store credit` : "",
+    outcome.toPayment > 0 ? `$${outcome.toPayment.toFixed(2)} to your original payment method` : "",
+  ].filter(Boolean).join(" and ");
+  const refundNote = outcome.amount > 0 ? ` You have been refunded $${outcome.amount.toFixed(2)} (${destinations}).` : "";
+  await createNotification(outcome.buyerId, `Your order for "${outcome.title}" was cancelled: ${reason}.${refundNote}`);
+  await notifyAdmins(`Seller #${req.user!.id} cancelled order #${orderId} item "${outcome.title}" and refunded $${outcome.amount.toFixed(2)}.`);
+  res.json({
+    ok: true,
+    orderCancelled: outcome.orderCancelled,
+    refund: { amount: outcome.amount.toFixed(2), storeCredit: outcome.toCredit.toFixed(2), originalPayment: outcome.toPayment.toFixed(2) },
+  });
 });
 
 fulfillmentRouter.post("/:orderId/items/:productId/deliver", async (req, res) => {
