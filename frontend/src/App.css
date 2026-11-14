@@ -938,6 +938,33 @@ button.danger {
   padding: 8px 12px;
 }
 
+.seller-action-row .pill {
+  align-self: center;
+}
+
+.seller-edit-item {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.seller-edit-item form {
+  display: grid;
+  gap: 10px;
+}
+
+.seller-edit-item label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+
+.seller-edit-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
 .checkout-credit-card,
 .checkout-payment-card,
 .checkout-summary {
@@ -999,6 +1026,56 @@ button.danger {
   margin-top: 3px;
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.checkout-summary-item small.checkout-summary-issue {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+/* REQ-030: two-step checkout (details, then review) */
+.checkout-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+}
+
+.checkout-steps li {
+  padding: 6px 12px;
+  color: var(--muted);
+  background: var(--primary-soft);
+  border-radius: 999px;
+}
+
+.checkout-steps li[aria-current="step"] {
+  color: white;
+  background: var(--primary);
+  font-weight: 700;
+}
+
+.checkout-review-block {
+  margin: 16px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.checkout-review-block h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.checkout-review-block p {
+  margin: 4px 0;
+}
+
+.checkout-review-address {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }
 
 .checkout-summary-lines {

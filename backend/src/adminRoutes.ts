@@ -321,8 +321,8 @@ adminRouter.patch("/orders/:id/status", async (req, res) => {
 
 adminRouter.get("/earnings", async (_req, res) => {
   const result = await pool.query(
-    `SELECT COALESCE(SUM(oi.quantity * oi.unit_price) FILTER (WHERE o.status NOT IN ('cancelled','refunded')), 0) AS "grossSales",
-            COUNT(DISTINCT o.id) FILTER (WHERE o.status NOT IN ('cancelled','refunded')) AS "orderCount"
+    `SELECT COALESCE(SUM(oi.quantity * oi.unit_price) FILTER (WHERE o.status NOT IN ('cancelled','refunded') AND oi.fulfillment_status <> 'cancelled'), 0) AS "grossSales",
+            COUNT(DISTINCT o.id) FILTER (WHERE o.status NOT IN ('cancelled','refunded') AND oi.fulfillment_status <> 'cancelled') AS "orderCount"
      FROM orders o JOIN order_items oi ON oi.order_id=o.id`,
   );
   res.json(result.rows[0]);

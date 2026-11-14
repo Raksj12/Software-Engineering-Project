@@ -134,6 +134,10 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS fulfillment_status TEXT NOT NUL
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS carrier TEXT;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS tracking_number TEXT;
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS cancel_reason TEXT;
+-- REQ-043: refund issued when a seller cancels an unshipped item
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS refund_amount NUMERIC(10, 2) NOT NULL DEFAULT 0
+  CHECK (refund_amount >= 0);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS refunded_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS refund_requests (
   id BIGSERIAL PRIMARY KEY,

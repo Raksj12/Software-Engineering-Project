@@ -5,7 +5,9 @@ import { createNotification, notifyAdmins } from "./notifications.js";
 export const ordersRouter = Router();
 
 const text = (value: unknown): string => (typeof value === "string" ? value.trim() : "");
-const REFUND_WINDOW_DAYS = Number(process.env.REFUND_WINDOW_DAYS) || 30;
+// REQ-035: refund requests are only accepted within this many days of the order date.
+const parsedRefundWindow = Number(process.env.REFUND_WINDOW_DAYS);
+export const REFUND_WINDOW_DAYS = Number.isInteger(parsedRefundWindow) && parsedRefundWindow > 0 ? parsedRefundWindow : 30;
 const TAX_RATES: Record<string, number> = {
   AL: 0.04, AK: 0, AZ: 0.056, AR: 0.065, CA: 0.0725, CO: 0.029, CT: 0.0635, DE: 0,
   FL: 0.06, GA: 0.04, HI: 0.04, ID: 0.06, IL: 0.0625, IN: 0.07, IA: 0.06, KS: 0.065,
@@ -41,13 +43,19 @@ ordersRouter.get("/checkout-summary", async (req, res) => {
   }
   const useStoreCredit = req.query.useStoreCredit === "true";
   const result = await pool.query(
-    `SELECT p.title, p.price, ci.quantity
+    `SELECT p.id, p.title, p.author, p.price, p.status, p.stock, ci.quantity
      FROM carts c
      JOIN cart_items ci ON ci.cart_id=c.id
      JOIN products p ON p.id=ci.product_id
-     WHERE c.buyer_id=$1 ORDER BY p.title`,
+     WHERE c.buyer_id=$1 ORDER BY p.title, p.id`,
     [req.user!.id],
   );
+  // REQ-030: flag anything checkout would reject, so the buyer sees it during review rather than after submitting.
+  const itemIssue = (item: { status: string; stock: number; quantity: number }): string | null => {
+    if (item.status !== "approved") return "No longer available";
+    if (item.stock < item.quantity) return item.stock > 0 ? `Only ${item.stock} left in stock` : "Out of stock";
+    return null;
+  };
   const subtotal = Number(result.rows.reduce((sum, item) => sum + Number(item.price) * Number(item.quantity), 0).toFixed(2));
   const taxRate = TAX_RATES[taxState];
   const taxAmount = Number((subtotal * taxRate).toFixed(2));
@@ -55,13 +63,18 @@ ordersRouter.get("/checkout-summary", async (req, res) => {
   const account = await pool.query("SELECT store_credit FROM users WHERE id=$1", [req.user!.id]);
   const availableCredit = Number(account.rows[0]?.store_credit || 0);
   const storeCreditApplied = useStoreCredit ? Math.min(availableCredit, total) : 0;
+  const items = result.rows.map((item) => ({
+    productId: Number(item.id),
+    title: item.title,
+    author: item.author,
+    quantity: item.quantity,
+    unitPrice: Number(item.price).toFixed(2),
+    lineTotal: (Number(item.price) * Number(item.quantity)).toFixed(2),
+    issue: itemIssue(item),
+  }));
   res.json({
-    items: result.rows.map((item) => ({
-      title: item.title,
-      quantity: item.quantity,
-      unitPrice: Number(item.price).toFixed(2),
-      lineTotal: (Number(item.price) * Number(item.quantity)).toFixed(2),
-    })),
+    items,
+    canCheckout: items.length > 0 && items.every((item) => item.issue === null),
     subtotal: subtotal.toFixed(2),
     taxState,
     taxRate,
@@ -77,13 +90,16 @@ ordersRouter.get("/", async (req, res) => {
   const result = await pool.query(
     `SELECT o.id, o.status, o.total_amount AS "totalAmount", o.shipping_address AS "shippingAddress",
             o.refund_status AS "refundStatus", o.refund_reason AS "refundReason", o.created_at AS "createdAt",
+            o.created_at + make_interval(days => $2::int) AS "refundDeadline",
+            (o.created_at > NOW() - make_interval(days => $2::int)) AS "refundWindowOpen",
             COALESCE(json_agg(json_build_object('productId', oi.product_id, 'title', p.title,
-              'quantity', oi.quantity, 'unitPrice', oi.unit_price, 'fulfillmentStatus', oi.fulfillment_status))
+              'quantity', oi.quantity, 'unitPrice', oi.unit_price, 'fulfillmentStatus', oi.fulfillment_status,
+              'cancelReason', oi.cancel_reason, 'refundAmount', oi.refund_amount))
               FILTER (WHERE oi.product_id IS NOT NULL), '[]') AS items
      FROM orders o LEFT JOIN order_items oi ON oi.order_id=o.id LEFT JOIN products p ON p.id=oi.product_id
-     WHERE o.buyer_id=$1 GROUP BY o.id ORDER BY o.created_at DESC`, [req.user!.id],
+     WHERE o.buyer_id=$1 GROUP BY o.id ORDER BY o.created_at DESC`, [req.user!.id, REFUND_WINDOW_DAYS],
   );
-  res.json({ orders: result.rows });
+  res.json({ orders: result.rows, refundWindowDays: REFUND_WINDOW_DAYS });
 });
 
 ordersRouter.post("/:orderId/refund", async (req, res) => {
@@ -93,33 +109,72 @@ ordersRouter.post("/:orderId/refund", async (req, res) => {
   if (!Number.isInteger(orderId) || orderId < 1 || !reason || !refundMethod) {
     res.status(400).json({ error: "A valid order, refund reason, and refund method are required." }); return;
   }
-  const result = await pool.query(
-    `INSERT INTO refund_requests (order_id,buyer_id,reason,refund_method,refund_amount)
-     SELECT id,buyer_id,$3,$4,total_amount FROM orders
-     WHERE id=$1 AND buyer_id=$2 AND status IN ('paid','processing','shipped','delivered')
-       AND refund_status='none'
-       AND created_at > NOW() - make_interval(days => $5::int)
-     RETURNING id, order_id AS "orderId", status, reason, created_at AS "createdAt"`,
-    [orderId, req.user!.id, reason, refundMethod, REFUND_WINDOW_DAYS],
-  );
-  if (!result.rowCount) {
-    const existing = await pool.query("SELECT buyer_id, refund_status, status, created_at FROM orders WHERE id=$1", [orderId]);
-    if (!existing.rowCount || existing.rows[0].buyer_id !== req.user!.id) { res.status(404).json({ error: "Order not found." }); return; }
-    const ageDays = (Date.now() - new Date(existing.rows[0].created_at).getTime()) / 86400000;
-    if (ageDays > REFUND_WINDOW_DAYS && existing.rows[0].refund_status === "none") {
-      res.status(400).json({ error: `Refund requests must be made within ${REFUND_WINDOW_DAYS} days of the order.` }); return;
+  // REQ-037: the request, the order status change, and the seller notifications commit together,
+  // so a request can never exist without its sellers having been told about it.
+  const client = await pool.connect();
+  let refund: Record<string, unknown> | undefined;
+  try {
+    await client.query("BEGIN");
+    const result = await client.query(
+      `INSERT INTO refund_requests (order_id,buyer_id,reason,refund_method,refund_amount)
+       SELECT id,buyer_id,$3,$4,
+              total_amount - COALESCE((SELECT SUM(refund_amount) FROM order_items WHERE order_id=orders.id), 0)
+       FROM orders
+       WHERE id=$1 AND buyer_id=$2 AND status IN ('paid','processing','shipped','delivered')
+         AND refund_status='none'
+         AND created_at > NOW() - make_interval(days => $5::int)
+       RETURNING id, order_id AS "orderId", status, reason, created_at AS "createdAt"`,
+      [orderId, req.user!.id, reason, refundMethod, REFUND_WINDOW_DAYS],
+    );
+    refund = result.rows[0];
+    if (refund) {
+      await client.query("UPDATE orders SET refund_status='requested', refund_reason=$2, updated_at=NOW() WHERE id=$1", [orderId, reason]);
+      // Look up each seller on the order along with only their own books, so each notice names what concerns them.
+      const sellers = await client.query(
+        `SELECT oi.seller_id AS "sellerId", array_agg(p.title ORDER BY p.title) AS titles
+         FROM order_items oi JOIN products p ON p.id=oi.product_id
+         WHERE oi.order_id=$1 GROUP BY oi.seller_id`,
+        [orderId],
+      );
+      for (const seller of sellers.rows as { sellerId: string; titles: string[] }[]) {
+        const books = seller.titles.map((title) => `"${title}"`).join(", ");
+        await client.query(
+          "INSERT INTO notifications (user_id, message) VALUES ($1, $2)",
+          [seller.sellerId, `Refund requested for order #${orderId} (your items: ${books}): ${reason}`],
+        );
+      }
+      await client.query("COMMIT");
+    } else {
+      await client.query("ROLLBACK");
+    }
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+  if (!refund) {
+    // Work out why the insert matched nothing. Expiry is computed with the DB clock so it agrees with the INSERT guard.
+    const existing = await pool.query(
+      `SELECT buyer_id AS "buyerId", refund_status AS "refundStatus", status,
+              created_at + make_interval(days => $2::int) AS deadline,
+              created_at <= NOW() - make_interval(days => $2::int) AS expired
+       FROM orders WHERE id=$1`,
+      [orderId, REFUND_WINDOW_DAYS],
+    );
+    const order = existing.rows[0];
+    if (!order || Number(order.buyerId) !== req.user!.id) { res.status(404).json({ error: "Order not found." }); return; }
+    if (order.refundStatus !== "none" || !["paid", "processing", "shipped", "delivered"].includes(order.status)) {
+      res.status(409).json({ error: "This order is not eligible or already has a refund request." }); return;
+    }
+    if (order.expired) {
+      const deadline = new Date(order.deadline).toISOString().slice(0, 10);
+      res.status(400).json({ error: `Refund requests must be made within ${REFUND_WINDOW_DAYS} days of the order (deadline was ${deadline}).` }); return;
     }
     res.status(409).json({ error: "This order is not eligible or already has a refund request." }); return;
   }
-  await pool.query("UPDATE orders SET refund_status='requested', refund_reason=$2, updated_at=NOW() WHERE id=$1", [orderId, reason]);
-  const sellers = await pool.query(
-    "SELECT DISTINCT seller_id AS \"sellerId\" FROM order_items WHERE order_id=$1", [orderId],
-  );
-  for (const seller of sellers.rows) {
-    await createNotification(seller.sellerId, `Refund requested for order #${orderId}: ${reason}`);
-  }
   await notifyAdmins(`Buyer #${req.user!.id} requested a return/refund for order #${orderId}: ${reason}`);
-  res.status(201).json({ refund: result.rows[0] });
+  res.status(201).json({ refund });
 });
 
 ordersRouter.patch("/:orderId", async (req, res) => {
@@ -272,7 +327,7 @@ ordersRouter.post("/checkout", async (req, res) => {
     await client.query("BEGIN");
     const cart = await client.query(
       `SELECT ci.product_id AS "productId", ci.quantity, p.title, p.price, p.stock,
-              p.seller_id AS "sellerId"
+              p.seller_id AS "sellerId", p.status
        FROM carts c
        JOIN cart_items ci ON ci.cart_id = c.id
        JOIN products p ON p.id = ci.product_id
@@ -288,6 +343,12 @@ ordersRouter.post("/checkout", async (req, res) => {
     }
 
     for (const item of cart.rows) {
+      // A listing can leave the storefront after it was carted (e.g. re-review after a material edit, REQ-010).
+      if (item.status !== "approved") {
+        await client.query("ROLLBACK");
+        res.status(409).json({ error: `"${item.title}" is not currently available. Remove it from your cart to continue.` });
+        return;
+      }
       if (item.stock < item.quantity) {
         await client.query("ROLLBACK");
         res.status(409).json({ error: `Only ${item.stock} left for ${item.title}.` });
@@ -303,6 +364,17 @@ ordersRouter.post("/checkout", async (req, res) => {
     const taxRate = TAX_RATES[taxState];
     const taxAmount = Number((subtotal * taxRate).toFixed(2));
     const total = subtotal + taxAmount;
+    // REQ-030: the buyer approves a specific total on the review step. If prices or the cart changed since,
+    // refuse rather than charge an amount they never saw.
+    const expectedTotal = req.body?.expectedTotal;
+    if (expectedTotal !== undefined && Math.abs(Number(expectedTotal) - Number(total.toFixed(2))) >= 0.005) {
+      await client.query("ROLLBACK");
+      res.status(409).json({
+        error: `Your order total changed to $${total.toFixed(2)} since you reviewed it. Please review your order again.`,
+        code: "TOTAL_CHANGED",
+      });
+      return;
+    }
     const account = await client.query(
       "SELECT store_credit FROM users WHERE id=$1 FOR UPDATE",
       [req.user!.id],
