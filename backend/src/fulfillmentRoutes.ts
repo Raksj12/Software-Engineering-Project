@@ -71,6 +71,12 @@ fulfillmentRouter.post("/refunds/:id/:decision", async (req, res) => {
     );
     if (decision === "approved") {
       await client.query("UPDATE orders SET refund_status='completed', status='refunded', refunded_at=NOW(), updated_at=NOW() WHERE id=$1", [row.orderId]);
+      await client.query(
+        `UPDATE products p SET stock = p.stock + oi.quantity, updated_at = NOW()
+         FROM order_items oi
+         WHERE oi.order_id = $1 AND oi.product_id = p.id AND oi.fulfillment_status <> 'cancelled'`,
+        [row.orderId],
+      );
       if (row.refundMethod === "store_credit") {
         await client.query("UPDATE users SET store_credit=store_credit+$1, updated_at=NOW() WHERE id=$2", [row.refundAmount, row.buyerId]);
       }
@@ -100,7 +106,7 @@ fulfillmentRouter.get("/", async (req, res) => {
     `SELECT oi.order_id AS "orderId", oi.product_id AS "productId", p.title, oi.quantity,
             oi.unit_price AS "unitPrice", oi.fulfillment_status AS "fulfillmentStatus",
             oi.carrier, oi.tracking_number AS "trackingNumber", oi.cancel_reason AS "cancelReason",
-            o.shipping_address AS "shippingAddress", o.status AS "paymentStatus", o.created_at AS "createdAt"
+            o.shipping_address AS "shippingAddress", o.status AS "paymentStatus", o.refund_status AS "refundStatus", o.created_at AS "createdAt"
      FROM order_items oi
      JOIN orders o ON o.id = oi.order_id
      JOIN products p ON p.id = oi.product_id
@@ -163,12 +169,13 @@ async function moveItem(
        AND oi.order_id = $5 AND oi.product_id = $6
        AND oi.seller_id = $7
        AND oi.fulfillment_status = ANY($8)
-       AND o.status <> 'pending'
+       AND o.status NOT IN ('pending', 'refunded', 'cancelled')
+       AND o.refund_status NOT IN ('requested', 'completed')
      RETURNING o.buyer_id AS "buyerId", p.title`,
     [to, extra.carrier ?? null, extra.tracking ?? null, extra.reason ?? null, orderId, productId, req.user!.id, from],
   );
   if (!result.rowCount) {
-    res.status(409).json({ error: "Order item not found, not yours, or not in a valid state for this action." });
+    res.status(409).json({ error: "Order item not found, not yours, not in a valid state for this action, or the order has a pending or completed refund." });
     return;
   }
   const { buyerId, title } = result.rows[0];

@@ -13,7 +13,7 @@ type Listing = {
   status: string;
   rejectionReason: string | null;
 };
-type Sale = { orderId: number; productId: number; title: string; quantity: number; fulfillmentStatus: string; carrier: string | null; trackingNumber: string | null };
+type Sale = { orderId: number; productId: number; title: string; quantity: number; fulfillmentStatus: string; carrier: string | null; trackingNumber: string | null; paymentStatus?: string; refundStatus?: string };
 type Refund = { id: number; orderId: number; buyerName: string; reason: string; status: string; refundMethod?: string; refundAmount?: string };
 type EarningsLine = { title: string; itemsSold: number; grossSales: string; orderCount: number };
 
@@ -105,7 +105,7 @@ function SellerHome() {
     }).catch(() => setListMessage("Could not load sales or refund requests."));
   }, []);
 
-  async function updateSale(sale: Sale, action: "process" | "ship" | "cancel") {
+  async function updateSale(sale: Sale, action: "process" | "ship" | "cancel" | "deliver") {
     const token = sessionStorage.getItem("authToken");
     const body = action === "ship" ? { carrier: "USPS", trackingNumber: "DEMO123456" } : action === "cancel" ? { reason: "Unable to fulfill" } : {};
     const response = await fetch(`http://localhost:3000/api/seller/orders/${sale.orderId}/items/${sale.productId}/${action}`, {
@@ -121,7 +121,11 @@ function SellerHome() {
     const response = await fetch(`http://localhost:3000/api/seller/orders/refunds/${id}/${decision}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     const data = await response.json();
     setListMessage(data.error || (response.ok ? "Refund request updated." : "Could not update refund."));
-    if (response.ok) setRefunds((await fetch("http://localhost:3000/api/seller/orders/refunds", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())).refunds);
+    if (response.ok) {
+      setRefunds((await fetch("http://localhost:3000/api/seller/orders/refunds", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())).refunds);
+      // The refund decision changes whether the order can be fulfilled, so reload the queue too
+      setSales((await fetch("http://localhost:3000/api/seller/orders", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())).items);
+    }
   }
 
   async function handleUpload(event: React.FormEvent<HTMLFormElement>) {
@@ -182,8 +186,16 @@ function SellerHome() {
     }
   }
 
-  const pendingSales = sales.filter((sale) => sale.fulfillmentStatus === "pending").length;
-  const openRefunds = refunds.filter((refund) => refund.status === "requested").length;
+  // Only items that still need the seller's attention stay in the queue
+  const activeSales = sales.filter((sale) => {
+    const done = ["delivered", "cancelled"].includes(sale.fulfillmentStatus)
+      || ["refunded", "cancelled"].includes(sale.paymentStatus || "");
+    return !done;
+  });
+  const pendingSales = activeSales.filter((sale) => sale.fulfillmentStatus === "pending").length;
+  // Only refund requests waiting for a decision stay in the panel
+  const activeRefunds = refunds.filter((refund) => refund.status === "requested");
+  const openRefunds = activeRefunds.length;
 
   return (
     <main className="page seller-workspace">
@@ -320,11 +332,50 @@ function SellerHome() {
       </section>
       <section className="panel seller-control-panel">
         <div className="seller-section-heading"><div><p className="eyebrow">Operations</p><h2>Fulfillment queue</h2></div><span className="pill">{pendingSales} pending</span></div>
-        {sales.length === 0 ? <p className="muted">No sales yet.</p> : <div className="seller-queue">{sales.map((sale) => <article className="seller-queue-item" key={`${sale.orderId}-${sale.productId}`}><div><strong>Order #{sale.orderId} · {sale.title}</strong><p className="muted">{sale.quantity} copy/copies · {sale.fulfillmentStatus}</p></div><div className="seller-action-row">{sale.fulfillmentStatus === "pending" && <button type="button" onClick={() => updateSale(sale, "process")}>Process</button>}{sale.fulfillmentStatus === "processing" && <button type="button" onClick={() => updateSale(sale, "ship")}>Mark shipped</button>}{["pending", "processing"].includes(sale.fulfillmentStatus) && <button className="danger" type="button" onClick={() => updateSale(sale, "cancel")}>Cancel</button>}</div></article>)}</div>}
+        {activeSales.length === 0 ? <p className="muted">No orders need action.</p> : (
+          <div className="seller-queue">
+            {activeSales.map((sale) => {
+              const locked = ["refunded", "cancelled"].includes(sale.paymentStatus || "") || ["requested", "completed"].includes(sale.refundStatus || "");
+              return (
+                <article className="seller-queue-item" key={`${sale.orderId}-${sale.productId}`}>
+                  <div>
+                    <strong>Order #{sale.orderId} · {sale.title}</strong>
+                    <p className="muted">{sale.quantity} copy/copies · {sale.fulfillmentStatus}</p>
+                    {locked && <small>{sale.refundStatus === "requested" ? "Refund requested: decide the refund before fulfilling." : "Refunded or cancelled: no further fulfillment."}</small>}
+                  </div>
+                  {!locked && (
+                    <div className="seller-action-row">
+                      {sale.fulfillmentStatus === "pending" && <button type="button" onClick={() => updateSale(sale, "process")}>Process</button>}
+                      {sale.fulfillmentStatus === "processing" && <button type="button" onClick={() => updateSale(sale, "ship")}>Mark shipped</button>}
+                      {sale.fulfillmentStatus === "shipped" && <button type="button" onClick={() => updateSale(sale, "deliver")}>Mark delivered</button>}
+                      {["pending", "processing"].includes(sale.fulfillmentStatus) && <button className="danger" type="button" onClick={() => updateSale(sale, "cancel")}>Cancel</button>}
+                    </div>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
       <section className="panel seller-control-panel">
         <div className="seller-section-heading"><div><p className="eyebrow">Customer care</p><h2>Refund requests</h2></div><span className="pill">{openRefunds} open</span></div>
-        {refunds.length === 0 ? <p className="muted">No refund requests.</p> : <div className="seller-queue">{refunds.map((refund) => <article className="seller-queue-item" key={refund.id}><div><strong>Order #{refund.orderId}</strong><p className="muted">{refund.buyerName} · ${Number(refund.refundAmount || 0).toFixed(2)} via {refund.refundMethod === "store_credit" ? "store credit" : "original payment"}</p><small>{refund.reason}</small></div>{refund.status === "requested" && <div className="seller-action-row"><button type="button" onClick={() => decideRefund(refund.id, "approve")}>Approve</button><button className="danger" type="button" onClick={() => decideRefund(refund.id, "reject")}>Deny</button></div>}</article>)}</div>}
+        {activeRefunds.length === 0 ? <p className="muted">No refund requests awaiting a decision.</p> : (
+          <div className="seller-queue">
+            {activeRefunds.map((refund) => (
+              <article className="seller-queue-item" key={refund.id}>
+                <div>
+                  <strong>Order #{refund.orderId}</strong>
+                  <p className="muted">{refund.buyerName} · ${Number(refund.refundAmount || 0).toFixed(2)} via {refund.refundMethod === "store_credit" ? "store credit" : "original payment"}</p>
+                  <small>{refund.reason}</small>
+                </div>
+                <div className="seller-action-row">
+                  <button type="button" onClick={() => decideRefund(refund.id, "approve")}>Approve</button>
+                  <button className="danger" type="button" onClick={() => decideRefund(refund.id, "reject")}>Deny</button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
       </div>
     </main>
