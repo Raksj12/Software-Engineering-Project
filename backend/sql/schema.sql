@@ -164,6 +164,15 @@ DROP TABLE IF EXISTS digital_deliveries;
 
 CREATE INDEX IF NOT EXISTS notifications_user_idx ON notifications(user_id);
 
+CREATE TABLE IF NOT EXISTS seller_webhooks (
+  seller_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  endpoint_url TEXT NOT NULL,
+  signing_secret TEXT NOT NULL,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Uploaded cover images, stored in the database. products.image_path holds /api/images/<id>.
 CREATE TABLE IF NOT EXISTS images (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

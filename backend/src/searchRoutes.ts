@@ -14,6 +14,7 @@ const FIELDS: Record<string, string> = {
 searchRouter.get("/", async (req, res) => {
   const field = typeof req.query.field === "string" ? req.query.field : "title";
   const genre = typeof req.query.genre === "string" ? req.query.genre.trim() : "";
+  const sort = typeof req.query.sort === "string" ? req.query.sort : "title-asc";
   let q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   const column = FIELDS[field];
   if (!column) {
@@ -32,16 +33,56 @@ searchRouter.get("/", async (req, res) => {
     params.push(genre);
     where += ` AND lower(p.genre) = lower($${params.length})`;
   }
+
+  const sortOptions: Record<string, string> = {
+    "title-asc": "p.title ASC",
+    "title-desc": "p.title DESC",
+    "price-asc": "p.price ASC",
+    "price-desc": "p.price DESC",
+    "newest": "p.created_at DESC",
+  };
+  const orderBy = sortOptions[sort];
+  if (!orderBy) {
+    res.status(400).json({ error: "Invalid sort option." });
+    return;
+  }
+
+  const requestedPage = Number(req.query.page);
+  const requestedLimit = Number(req.query.limit);
+  const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const limit = Number.isInteger(requestedLimit) && requestedLimit > 0
+    ? Math.min(requestedLimit, 100)
+    : 12;
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int AS total
+     FROM products p JOIN users u ON u.id = p.seller_id
+     WHERE ${where}`,
+    params,
+  );
+  const total = countResult.rows[0].total;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(page, totalPages);
+  const offset = (safePage - 1) * limit;
+
+  const dataParams = [...params, limit, offset];
   const result = await pool.query(
     `SELECT p.id, p.title, p.author, p.isbn, p.genre, p.condition, p.price, p.stock,
             p.image_path AS "imagePath", (p.stock = 0) AS "outOfStock", u.full_name AS "sellerName"
      FROM products p JOIN users u ON u.id = p.seller_id
-     WHERE ${where} ORDER BY p.title ASC`,
-    params,
+     WHERE ${where} ORDER BY ${orderBy}, p.id ASC
+     LIMIT $${dataParams.length - 1} OFFSET $${dataParams.length}`,
+    dataParams,
   );
   res.json({
     products: result.rows,
     message: result.rows.length ? undefined : "No results found.",
+    pagination: {
+      page: safePage,
+      limit,
+      total,
+      totalPages,
+    },
   });
 });
 

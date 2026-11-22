@@ -303,6 +303,39 @@ p {
   flex: 0 0 auto;
 }
 
+.catalog-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: -12px 0 24px;
+}
+
+.catalog-controls label {
+  display: grid;
+  gap: 6px;
+  min-width: 190px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.catalog-controls select {
+  width: 190px;
+}
+
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.pagination button {
+  min-width: 44px;
+  width: auto;
+}
+
 input,
 select,
 textarea {
@@ -1157,6 +1190,45 @@ button.danger {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.warehouse-panel {
+  border-top: 4px solid var(--primary);
+  background:
+    linear-gradient(135deg, rgba(86, 103, 216, 0.055), transparent 55%),
+    var(--surface);
+}
+
+.warehouse-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.warehouse-form label {
+  display: grid;
+  gap: 7px;
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.warehouse-form .warehouse-toggle {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 10px;
+}
+
+.warehouse-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
+.warehouse-form .seller-action-row {
+  grid-column: 1 / -1;
   margin: 22px 0;
 }
 
@@ -1256,6 +1328,15 @@ button.danger {
   .search-bar select {
     width: 100%;
     flex-basis: auto;
+  }
+
+  .warehouse-form {
+    grid-template-columns: 1fr;
+  }
+
+  .warehouse-form .warehouse-toggle,
+  .warehouse-form .seller-action-row {
+    grid-column: 1;
   }
 
   .compare-toolbar {

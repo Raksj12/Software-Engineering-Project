@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 function Profile() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  const [storeName, setStoreName] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [role, setRole] = useState("");
@@ -40,6 +43,7 @@ function Profile() {
 
         setFullName(data.user.fullName);
         setEmail(data.user.email);
+        setStoreName(data.user.storeName || "");
         setRole(data.user.role);
         if (data.user.role === "seller") {
           const earningsResponse = await fetch("http://localhost:3000/api/seller/orders/earnings", {
@@ -84,7 +88,12 @@ function Profile() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ fullName, email }),
+        body: JSON.stringify({
+          fullName,
+          email,
+          storeName: role === "seller" ? storeName : undefined,
+          ...(newPassword ? { currentPassword, password: newPassword } : {}),
+        }),
       });
 
       const data = await response.json();
@@ -101,6 +110,9 @@ function Profile() {
 
       setFullName(data.user.fullName);
       setEmail(data.user.email);
+      setStoreName(data.user.storeName || "");
+      setCurrentPassword("");
+      setNewPassword("");
       setMessage("Profile updated successfully.");
     } catch {
       setMessage("Could not connect to the server.");
@@ -131,6 +143,32 @@ function Profile() {
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
+          />
+
+          {role === "seller" && (
+            <input
+              type="text"
+              placeholder="Seller/store name"
+              value={storeName}
+              onChange={(event) => setStoreName(event.target.value)}
+            />
+          )}
+
+          <input
+            type="password"
+            placeholder="Current password (only when changing password)"
+            value={currentPassword}
+            onChange={(event) => setCurrentPassword(event.target.value)}
+            autoComplete="current-password"
+          />
+
+          <input
+            type="password"
+            placeholder="New password (8 characters minimum)"
+            value={newPassword}
+            onChange={(event) => setNewPassword(event.target.value)}
+            autoComplete="new-password"
+            minLength={8}
           />
 
           <button type="submit">Save Changes</button>

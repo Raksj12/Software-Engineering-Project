@@ -8,7 +8,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "db:seed": "tsx src/seed.ts",
-    "test": "set NODE_ENV=test&& node --import tsx --test tests/*.test.ts",
+    "test": "cross-env NODE_ENV=test node --import tsx --test tests/*.test.ts",
+    "test:ci": "cross-env NODE_ENV=test node --import tsx --test --test-reporter=junit --test-reporter-destination=test-results.xml tests/*.test.ts",
     "test:postman": "newman run ../tests/postman/sprint4_collection.json",
     "test:e2e": "playwright test"
   },
@@ -29,6 +30,7 @@
     "@types/multer": "^2.3.0",
     "@types/node": "^26.6.5",
     "@types/pg": "^8.23.1",
+    "cross-env": "^10.1.0",
     "newman": "^6.2.3",
     "tsx": "^4.23.15",
     "txt": "^1.0.0",

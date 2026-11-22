@@ -1,5 +1,7 @@
 # BookHaven
 
+[![Continuous Integration](https://github.com/Raksj12/Software-Engineering-Project/actions/workflows/ci.yml/badge.svg)](https://github.com/Raksj12/Software-Engineering-Project/actions/workflows/ci.yml)
+
 **A web-based online bookstore marketplace connecting independent booksellers with readers.**
 
 BookHaven lets sellers list books for sale, lets buyers search, browse, and purchase those listings, and gives a platform administrator control over listing quality through a review-and-approval workflow. It's being built from scratch as a full-stack e-commerce web application for CSE 4214.
@@ -260,6 +262,31 @@ cd ..\frontend
 npm run build
 npm run lint
 ```
+
+### Continuous Integration
+
+GitHub Actions runs the CI workflow in [`.github/workflows/ci.yml`](.github/workflows/ci.yml):
+
+- Backend pushes and pull requests start a PostgreSQL 16 test database, apply the database schema, seed test data, run the Node test suite, and build the TypeScript backend.
+- Frontend pushes and pull requests install dependencies, run ESLint, and build the Vite application.
+- JUnit test output is saved as `test-results.xml` and uploaded as the `backend-test-results` workflow artifact, including when tests fail.
+- The workflow runs for every push and for pull requests targeting `main`, `staging`, or `testing`.
+
+### Sprint 5 warehouse integration
+
+Each seller can configure a private warehouse endpoint from the Seller Workspace:
+
+- `PUT /api/seller/warehouse/config` creates or updates the seller's HTTPS endpoint, signing secret, and enabled state.
+- `GET /api/seller/warehouse/config` returns only the authenticated seller's configuration.
+- `POST /api/seller/warehouse/test` sends a signed test event.
+- Fulfillment changes send `order_item.fulfillment_changed` events to that seller's endpoint.
+
+Warehouse payloads include an event ID and creation timestamp. Requests use `X-BookHaven-Event` and
+`X-BookHaven-Signature: sha256=<hex-hmac>` headers. Verify the HMAC using the raw JSON request body
+and the seller's private signing secret. HTTP endpoints are accepted only for localhost; production
+integrations must use HTTPS.
+
+API mutation requests reject malformed JSON, arrays, and invalid required fields before database work.
 
 ### Connection troubleshooting
 

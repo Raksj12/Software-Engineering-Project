@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from "express";
 import { pool } from "./db.js";
 import { createNotification, notifyAdmins } from "./notifications.js";
+import { sendWarehouseEvent } from "./warehouse.js";
 
 export const fulfillmentRouter = Router();
 
@@ -172,6 +173,14 @@ async function moveItem(
     return;
   }
   const { buyerId, title } = result.rows[0];
+  await sendWarehouseEvent(req.user!.id, "order_item.fulfillment_changed", {
+    orderId,
+    productId,
+    productTitle: title,
+    fulfillmentStatus: to,
+    carrier: extra.carrier ?? null,
+    trackingNumber: extra.tracking ?? null,
+  });
   await notifyAdmins(`Seller #${req.user!.id} changed order #${orderId} item "${title}" to ${to}.`);
   if (to === "processing") {
     await pool.query("UPDATE orders SET status='processing', updated_at=NOW() WHERE id=$1 AND status IN ('paid','processing')", [orderId]);
@@ -195,7 +204,7 @@ fulfillmentRouter.post("/:orderId/items/:productId/process", async (req, res) =>
 fulfillmentRouter.post("/:orderId/items/:productId/ship", async (req, res) => {
   const carrier = typeof req.body?.carrier === "string" ? req.body.carrier.trim() : "";
   const tracking = typeof req.body?.trackingNumber === "string" ? req.body.trackingNumber.trim() : "";
-  if (!carrier || !tracking) {
+  if (!carrier || !tracking || carrier.length > 100 || tracking.length > 100) {
     res.status(400).json({ error: "carrier and trackingNumber are required." });
     return;
   }
@@ -206,7 +215,7 @@ fulfillmentRouter.post("/:orderId/items/:productId/ship", async (req, res) => {
 // pending/processing -> cancelled (reason required, not after shipping)
 fulfillmentRouter.post("/:orderId/items/:productId/cancel", async (req, res) => {
   const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
-  if (!reason) {
+  if (!reason || reason.length > 500) {
     res.status(400).json({ error: "A cancellation reason is required." });
     return;
   }

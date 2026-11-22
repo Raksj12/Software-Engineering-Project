@@ -1,0 +1,35 @@
+Test Case ID,Requirement ID(s),Title,Type,Status,Automation,Evidence
+TC-001,"REQ-001,REQ-003",Buyer authentication,Integration,Pass,Backend test auth.test.ts,Login and token behavior
+TC-002,REQ-004,Invalid login is generic,Integration,Pass,Backend/API implementation,Generic invalid credentials response
+TC-003,REQ-009,ISBN validation,Unit,Pass,Backend test suite,Valid and invalid ISBN checksum checks
+TC-005,"REQ-021,REQ-022,REQ-023",Search sorting and no-results,Integration,Implemented,CI backend build,Search API and pagination implementation
+TC-006,"REQ-027,REQ-028",Cart add/remove,Integration,Implemented,CI backend build,Cart API implemented
+TC-007,"REQ-029,REQ-030,REQ-032",Cart checkout,E2E,Implemented,Manual fixture required,Frontend and API implemented
+TC-009,"REQ-034,REQ-035,REQ-036,REQ-037",Refund request validation,Integration,Pass,backend/tests/orders.test.ts,Login reason and missing-order branches
+TC-010,REQ-039,Seller refund decision,E2E,Implemented,Manual fixture required,Seller/admin refund APIs implemented
+TC-011,"REQ-040,REQ-041,REQ-042,REQ-044",Fulfillment transitions,Integration,Implemented,CI backend build,Fulfillment API implemented
+TC-012,"REQ-047,REQ-048,REQ-049,REQ-051",Review rules,Integration,Pass,backend/tests/reviews.test.ts,Review validation branches
+TC-013,REQ-052,Read product reviews,Manual,Implemented,Manual fixture required,Review API and details UI implemented
+TC-014,"REQ-053,REQ-054,REQ-055,REQ-056,REQ-057",Wishlist lifecycle,Integration,Pass,backend/tests/wishlist.test.ts,Wishlist validation branches
+TC-017,Sprint 4,Buyer order history login,Integration,Pass,backend/tests/orders.test.ts,401 without login
+TC-018,Sprint 4,Buyer order history,Integration,Pass,backend/tests/orders.test.ts,Buyer orders returned
+TC-019,Sprint 4,Buyer with no orders,Integration,Pass,backend/tests/orders.test.ts,Empty order history
+TC-020,REQ-034,Refund requires login,Integration,Pass,backend/tests/orders.test.ts,401 without login
+TC-021,REQ-036,Refund requires reason,Integration,Pass,backend/tests/orders.test.ts,400 for empty reason
+TC-022,Sprint 4,Invalid refund order ID,Integration,Pass,backend/tests/orders.test.ts,400 for negative ID
+TC-023,REQ-034,Missing refund order,Integration,Pass,backend/tests/orders.test.ts,404 for nonexistent order
+TC-024,REQ-058,Compare approved books,Integration,Implemented,Manual fixture required,Comparison API and UI implemented
+TC-025,REQ-059;REQ-060,Quantity and tax checkout,Integration,Implemented,Manual fixture required,Quantity tax and persistence implemented
+TC-027,REQ-063,Admin order intervention,Integration,Implemented,Manual fixture required,Admin status API implemented
+TC-028,REQ-062,Cart quantity badge,Component/Integration,Implemented,Manual fixture required,Header badge implementation
+TC-029,REQ-062,Seller earnings breakdown,Integration,Implemented,Manual fixture required,Earnings API implemented
+TC-030,REQ-034,Local return/refund semantics,Integration,Implemented,Manual fixture required,No physical carrier integration
+TC-031,REQ-064,Role inboxes,Integration,Implemented,Manual fixture required,Buyer seller and admin inboxes implemented
+TC-032,REQ-065,Automatic refund processing,Integration,Implemented,Manual fixture required,Store credit and original-payment state implemented
+TC-033,REQ-066,Store-credit visibility,Integration,Implemented,Manual fixture required,Balance and refund destination implemented
+TC-034,REQ-067,Store-credit checkout,Integration,Implemented,Manual fixture required,Atomic credit deduction implemented
+TC-035,REQ-068,Admin operational control center,Component/Integration,Implemented,Manual fixture required,Admin dashboard implemented
+TC-036,REQ-069,Seller operations workspace,Component/Integration,Implemented,Manual fixture required,Seller dashboard implemented
+TC-037,SPRINT-5,Private warehouse webhook,Integration,Pass,backend/tests/sprint5.test.ts,HMAC signature and seller configuration behavior
+TC-038,SPRINT-5,Malformed JSON rejection,Security,Pass,backend/tests/sprint5.test.ts,Malformed JSON and JSON arrays rejected
+TC-039,SPRINT-5,Invalid registration data,Security,Pass,backend/tests/sprint5.test.ts,Email role password and name validation

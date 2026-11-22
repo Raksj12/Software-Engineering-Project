@@ -14,6 +14,7 @@ import { sellerListingsRouter } from "./sellerListings.js";
 import { ordersRouter } from "./orders.js";
 import { imagesRouter } from "./images.js";
 import cartRouter from "./cart.js";
+import { warehouseRouter } from "./warehouse.js";
 
 dotenv.config();
 
@@ -35,7 +36,23 @@ app.use(
 
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
+
+// API mutation guard: validate the request shape before route/database work.
+app.use((req, res, next) => {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    if (req.method === "DELETE" && !req.body) {
+      next();
+      return;
+    }
+    if (req.is("application/json") && req.body !== undefined &&
+        (req.body === null || typeof req.body !== "object" || Array.isArray(req.body))) {
+      res.status(400).json({ error: "JSON request body must be an object." });
+      return;
+    }
+  }
+  next();
+});
 
 app.get("/api/health", (_req, res) => {
   res.status(200).json({ status: "ok", message: "BookHaven API is running" });
@@ -69,7 +86,10 @@ app.post("/api/auth/register", async (req, res, next) => {
       fullName?: string;
       role?: Role;
     };
-    if (!email || !password || !fullName || !["buyer", "seller"].includes(role) || password.length < 8) {
+    if (typeof email !== "string" || typeof password !== "string" || typeof fullName !== "string" ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
+        fullName.trim().length < 2 || fullName.length > 100 ||
+        !["buyer", "seller"].includes(role) || password.length < 8 || password.length > 128) {
       res.status(400).json({ error: "Email, full name, buyer/seller role, and a password of at least 8 characters are required." });
       return;
     }
@@ -90,7 +110,8 @@ app.post("/api/auth/register", async (req, res, next) => {
 app.post("/api/auth/login", async (req, res, next) => {
   try {
     const { email, password } = req.body as { email?: string; password?: string };
-    if (!email || !password) {
+    if (typeof email !== "string" || typeof password !== "string" ||
+        !email.trim() || email.length > 254 || password.length > 128) {
       res.status(400).json({ error: "Email and password are required." });
       return;
     }
@@ -123,7 +144,7 @@ app.get("/api/auth/me", authRequired, async (req, res, next) => {
   try {
     // Get the user's latest information from the database
     const result = await pool.query(
-      `SELECT id, email, full_name AS "fullName", role, status
+      `SELECT id, email, full_name AS "fullName", store_name AS "storeName", role, status
        FROM users
        WHERE id = $1`,
       [req.user!.id]
@@ -271,6 +292,7 @@ app.use("/api/notifications", authRequired, notificationsRouter);
 app.use("/api/listings", searchRouter);
 app.use("/api/seller/orders", authRequired, requireRoles("seller", "admin"), fulfillmentRouter);
 app.use("/api/seller/listings", authRequired, requireRoles("seller", "admin"), sellerListingsRouter);
+app.use("/api/seller/warehouse", authRequired, requireRoles("seller"), warehouseRouter);
 app.use("/api/orders", authRequired, requireRoles("buyer", "admin"), ordersRouter);
 app.use("/api/cart", authRequired, requireRoles("buyer", "admin"), cartRouter);
 app.use("/api/images", imagesRouter);
@@ -296,6 +318,10 @@ app.use((_req, res) => {
 
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   console.error("Unhandled API error:", error);
+  if (error instanceof SyntaxError) {
+    res.status(400).json({ error: "Malformed JSON request body." });
+    return;
+  }
   res.status(500).json({ error: "Internal server error." });
 });
 

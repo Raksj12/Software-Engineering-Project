@@ -19,11 +19,11 @@
 - [x] Implement database-backed login and role-based route protection
 
 ## Jalil Jimenez
-- [ ] Implement seller listing create/edit/remove APIs
-- [ ] Add ISBN-10/ISBN-13 validation in listing flow
-- [ ] Enforce seller ownership on listing modifications
-- [ ] Implement return/refund request and policy checks
-- [ ] Add persistence models/migrations for listings and returns
+- [x] Implement seller listing create/edit/remove APIs
+- [x] Add ISBN-10/ISBN-13 validation in listing flow
+- [x] Enforce seller ownership on listing modifications
+- [x] Implement return/refund request and policy checks
+- [x] Add persistence models/migrations for listings and returns
 
 ## Everett Wappler
 - [x] Implement admin listing moderation queue and actions
@@ -31,3 +31,9 @@
 - [ ] Implement search/browse by title/author/genre/ISBN
 - [x] Implement order fulfillment (processing, shipping, tracking, cancel)
 - [x] Add notifications for moderation and fulfillment updates
+
+## Sprint 5
+- [x] Add private seller warehouse webhook configuration and signed event delivery
+- [x] Add API mutation shape, JSON, authentication, and field validation hardening
+- [x] Modernize warehouse settings and responsive seller UI
+- [x] Add security/regression test coverage and JUnit CI artifacts

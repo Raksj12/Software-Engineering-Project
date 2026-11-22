@@ -39,22 +39,27 @@ sellerListingsRouter.patch("/:id", async (req, res) => {
   if (!Number.isInteger(listingId) || listingId < 1) { res.status(400).json({ error: "Invalid listing id." }); return; }
   const body = req.body ?? {};
   const title = text(body.title), author = text(body.author), genre = text(body.genre), description = text(body.description);
+  const isbn = text(body.isbn).replace(/[-\s]/g, "");
   const condition = text(body.condition).toLowerCase();
   const price = parsePrice(body.price), stock = Number(body.stock);
-  if (!title || !author || !genre || !description || !CONDITIONS.includes(condition) ||
+  if (!title || !author || !isbn || !genre || !description || !CONDITIONS.includes(condition) ||
       price === null || !Number.isInteger(stock) || stock < 0) {
     res.status(400).json({ error: "Enter a valid price greater than 0 with no more than two decimal places (for example, 12.99)." }); return;
+  }
+  if (!isValidIsbn(isbn)) {
+    res.status(400).json({ error: "Invalid ISBN. Enter a valid ISBN-10 or ISBN-13." }); return;
   }
   const validGenre = await canonicalGenre(genre);
   if (!validGenre) { res.status(400).json({ error: "Please choose a genre from the list." }); return; }
 
   const result = await pool.query(
-    `UPDATE products SET title=$1, author=$2, genre=$3, description=$4, condition=$5, price=$6, stock=$7,
-       status=CASE WHEN status='approved' THEN 'pending' ELSE status END, updated_at=NOW()
-     WHERE id=$8 AND seller_id=$9 RETURNING ${LISTING_COLUMNS}`,
-    [title, author, validGenre, description, condition, price, stock, listingId, req.user!.id],
+    `UPDATE products SET title=$1, author=$2, isbn=$3, genre=$4, description=$5, condition=$6, price=$7, stock=$8,
+       status=CASE WHEN status='approved' THEN 'pending' ELSE status END, rejection_reason=NULL, updated_at=NOW()
+     WHERE id=$9 AND seller_id=$10 RETURNING ${LISTING_COLUMNS}`,
+    [title, author, isbn, validGenre, description, condition, price, stock, listingId, req.user!.id],
   );
   if (!result.rowCount) { res.status(404).json({ error: "Listing not found." }); return; }
+  await notifyAdmins(`Seller #${req.user!.id} edited listing "${title}" and submitted it for moderation.`);
   res.json({ listing: result.rows[0] });
 });
 

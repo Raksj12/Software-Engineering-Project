@@ -4,7 +4,7 @@ REQ-002,Registration must be valid,The system shall reject incomplete or duplica
 REQ-003,Users need role access,The system shall authenticate users and redirect by role.,Completed,TC-001,backend/src/index.ts; frontend/src/Account/Login.tsx,SRS 3.1
 REQ-004,Credentials must not leak detail,The system shall return a generic invalid-login error.,Completed,TC-002,backend/src/index.ts,SRS 3.1
 REQ-005,Users need logout,The system shall allow logged-in users to log out.,Completed,TC-001,backend/src/index.ts; frontend/src/Account/Login.tsx,SRS 3.1
-REQ-006,Users need profile maintenance,The system shall allow users to edit permitted account information.,In Progress,TC-015,backend/src/index.ts; frontend/src/Account/Profile.tsx,Password/store name incomplete
+REQ-006,Users need profile maintenance,The system shall allow users to edit permitted account information.,Completed,TC-015,backend/src/index.ts; frontend/src/Account/Profile.tsx,Name email password and seller store name editing implemented
 REQ-008,Sellers need listings,The system shall allow sellers to create complete listings with optional images.,Completed,TC-004,backend/src/sellerListings.ts; frontend/src/Seller/SellerHome.tsx,SRS 3.2
 REQ-009,ISBN must be valid,The system shall validate ISBN-10 and ISBN-13 checksums.,Completed,TC-003,backend/src/isbn.ts,SRS 3.2
 REQ-010,List moderation is required,The system shall place new/materially edited listings into pending review.,In Progress,TC-004,backend/src/sellerListings.ts,Edit review behavior incomplete

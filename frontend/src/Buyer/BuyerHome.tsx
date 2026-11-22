@@ -16,9 +16,9 @@ type Book = {
 };
 type BuyerAccount = { storeCredit: string };
 
-// Get published books, optionally filtered by a search term and genre
-async function fetchBooks(query: string, field: string, genre = "") {
-  const params = new URLSearchParams({ q: query, field });
+// Get published books, optionally filtered by search, genre, sort, and pagination
+async function fetchBooks(query: string, field: string, genre = "", sort = "title-asc", page = 1, limit = 12) {
+  const params = new URLSearchParams({ q: query, field, sort, page: String(page), limit: String(limit) });
   if (genre) params.set("genre", genre);
   const response = await fetch(`http://localhost:3000/api/listings?${params}`);
   const data = await response.json();
@@ -27,7 +27,11 @@ async function fetchBooks(query: string, field: string, genre = "") {
     throw new Error(data.error || "Could not load books.");
   }
 
-  return data as { products: Book[]; message?: string };
+  return data as {
+    products: Book[];
+    message?: string;
+    pagination: { page: number; limit: number; total: number; totalPages: number };
+  };
 }
 
 function BuyerHome() {
@@ -40,14 +44,18 @@ function BuyerHome() {
   const [compareIds, setCompareIds] = useState<string[]>([]);
   const [cartQuantities, setCartQuantities] = useState<Record<string, number>>({});
   const [storeCredit, setStoreCredit] = useState("0.00");
+  const [sort, setSort] = useState("title-asc");
+  const [pageSize, setPageSize] = useState(12);
+  const [pagination, setPagination] = useState({ page: 1, limit: 12, total: 0, totalPages: 1 });
   const navigate = useNavigate();
 
   // Show all published books when the page opens
   useEffect(() => {
-    fetchBooks("", "title")
+    fetchBooks("", "title", "", "title-asc", 1, 12)
       .then((data) => {
         setBooks(data.products);
         setMessage(data.message || "");
+        setPagination(data.pagination);
       })
       .catch(() => setMessage("Could not connect to the server."));
   }, []);
@@ -76,9 +84,10 @@ function BuyerHome() {
     setMessage("");
 
     try {
-      const data = await fetchBooks(query, field, selectedGenre);
+      const data = await fetchBooks(query, field, selectedGenre, sort, 1, pageSize);
       setBooks(data.products);
       setMessage(data.message || "");
+      setPagination(data.pagination);
     } catch (error) {
       setBooks([]);
       setMessage(error instanceof Error ? error.message : "Could not connect to the server.");
@@ -90,9 +99,46 @@ function BuyerHome() {
   async function chooseGenre(genre: string) {
     setSelectedGenre(genre);
     try {
-      const data = await fetchBooks(query, field, genre);
+      const data = await fetchBooks(query, field, genre, sort, 1, pageSize);
       setBooks(data.products);
       setMessage(data.message || "");
+      setPagination(data.pagination);
+    } catch {
+      setMessage("Could not connect to the server.");
+    }
+  }
+
+  async function loadPage(nextPage: number) {
+    setMessage("");
+    try {
+      const data = await fetchBooks(query, field, selectedGenre, sort, nextPage, pageSize);
+      setBooks(data.products);
+      setPagination(data.pagination);
+      setMessage(data.message || "");
+    } catch {
+      setMessage("Could not connect to the server.");
+    }
+  }
+
+  async function changeSort(nextSort: string) {
+    setSort(nextSort);
+    try {
+      const data = await fetchBooks(query, field, selectedGenre, nextSort, 1, pageSize);
+      setBooks(data.products);
+      setMessage(data.message || "");
+      setPagination(data.pagination);
+    } catch {
+      setMessage("Could not connect to the server.");
+    }
+  }
+
+  async function changePageSize(nextSize: number) {
+    setPageSize(nextSize);
+    try {
+      const data = await fetchBooks(query, field, selectedGenre, sort, 1, nextSize);
+      setBooks(data.products);
+      setMessage(data.message || "");
+      setPagination(data.pagination);
     } catch {
       setMessage("Could not connect to the server.");
     }
@@ -138,7 +184,7 @@ function BuyerHome() {
           <h2>Books for sale</h2>
           <p className="muted">Choose 2–4 books below to compare their prices, descriptions, sellers, and availability.</p>
         </div>
-        <span className="pill">{books.length} {books.length === 1 ? "book" : "books"}</span>
+        <span className="pill">{pagination.total} {pagination.total === 1 ? "book" : "books"}</span>
       </div>
       <section className="panel form-card">
         <p className="eyebrow">Buyer wallet</p>
@@ -183,6 +229,27 @@ function BuyerHome() {
         <button type="submit">Search</button>
       </form>
 
+      <div className="catalog-controls">
+        <label>
+          <span>Sort by</span>
+          <select value={sort} onChange={(event) => changeSort(event.target.value)}>
+            <option value="title-asc">Title: A to Z</option>
+            <option value="title-desc">Title: Z to A</option>
+            <option value="price-asc">Price: Low to High</option>
+            <option value="price-desc">Price: High to Low</option>
+            <option value="newest">Newest listings</option>
+          </select>
+        </label>
+        <label>
+          <span>Books per page</span>
+          <select value={pageSize} onChange={(event) => changePageSize(Number(event.target.value))}>
+            <option value="6">6</option>
+            <option value="12">12</option>
+            <option value="24">24</option>
+          </select>
+        </label>
+      </div>
+
       {message && <p className="status-message">{message}</p>}
 
       <ul className="book-grid">
@@ -225,6 +292,28 @@ function BuyerHome() {
           </li>
         ))}
       </ul>
+
+      {pagination.totalPages > 1 && (
+        <nav className="pagination" aria-label="Book listing pages">
+          <button type="button" className="secondary" disabled={pagination.page <= 1} onClick={() => loadPage(pagination.page - 1)}>
+            Previous
+          </button>
+          {Array.from({ length: pagination.totalPages }, (_, index) => index + 1).map((pageNumber) => (
+            <button
+              key={pageNumber}
+              type="button"
+              className={pagination.page === pageNumber ? "" : "secondary"}
+              onClick={() => loadPage(pageNumber)}
+              aria-current={pagination.page === pageNumber ? "page" : undefined}
+            >
+              {pageNumber}
+            </button>
+          ))}
+          <button type="button" className="secondary" disabled={pagination.page >= pagination.totalPages} onClick={() => loadPage(pagination.page + 1)}>
+            Next
+          </button>
+        </nav>
+      )}
     </main>
   );
 }

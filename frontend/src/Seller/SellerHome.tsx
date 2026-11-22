@@ -7,6 +7,7 @@ type Listing = {
   isbn: string;
   genre: string;
   condition: string;
+  description: string;
   price: string;
   stock: number;
   imagePath: string | null;
@@ -65,6 +66,12 @@ function SellerHome() {
   const [refunds, setRefunds] = useState<Refund[]>([]);
   const [earnings, setEarnings] = useState<{ grossSales: string; itemsSold: number; orderCount: number } | null>(null);
   const [earningsBreakdown, setEarningsBreakdown] = useState<EarningsLine[]>([]);
+  const [editingListingId, setEditingListingId] = useState<string | null>(null);
+  const [warehouseUrl, setWarehouseUrl] = useState("");
+  const [warehouseSecret, setWarehouseSecret] = useState("");
+  const [warehouseEnabled, setWarehouseEnabled] = useState(true);
+  const [warehouseConfigured, setWarehouseConfigured] = useState(false);
+  const [warehouseMessage, setWarehouseMessage] = useState("");
 
   useEffect(() => {
     fetchMyListings()
@@ -85,6 +92,20 @@ function SellerHome() {
       .then((response) => response.json())
       .then((data) => setEarningsBreakdown(data.breakdown || []))
       .catch(() => setListMessage("Could not load earnings breakdown."));
+  }, []);
+
+  useEffect(() => {
+    fetch("http://localhost:3000/api/seller/warehouse/config", {
+      headers: { Authorization: `Bearer ${sessionStorage.getItem("authToken")}` },
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setWarehouseConfigured(Boolean(data.configured));
+        setWarehouseUrl(data.endpointUrl || "");
+        setWarehouseSecret("");
+        setWarehouseEnabled(data.enabled !== false);
+      })
+      .catch(() => setWarehouseMessage("Could not load warehouse webhook settings."));
   }, []);
 
   useEffect(() => {
@@ -116,6 +137,45 @@ function SellerHome() {
     if (response.ok) setSales((await fetch("http://localhost:3000/api/seller/orders", { headers: { Authorization: `Bearer ${token}` } }).then((r) => r.json())).items);
   }
 
+  async function saveWarehouse(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setWarehouseMessage("");
+    try {
+      const response = await fetch("http://localhost:3000/api/seller/warehouse/config", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
+        },
+        body: JSON.stringify({ endpointUrl: warehouseUrl, signingSecret: warehouseSecret, enabled: warehouseEnabled }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setWarehouseMessage(data.error || "Could not save warehouse webhook.");
+        return;
+      }
+      setWarehouseConfigured(true);
+      setWarehouseSecret(data.signingSecret);
+      setWarehouseMessage("Private warehouse webhook saved.");
+    } catch {
+      setWarehouseMessage("Could not connect to the server.");
+    }
+  }
+
+  async function testWarehouse() {
+    setWarehouseMessage("");
+    try {
+      const response = await fetch("http://localhost:3000/api/seller/warehouse/test", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${sessionStorage.getItem("authToken")}` },
+      });
+      const data = await response.json();
+      setWarehouseMessage(data.error || data.message || "Test event result received.");
+    } catch {
+      setWarehouseMessage("Could not send the warehouse test event.");
+    }
+  }
+
   async function decideRefund(id: number, decision: "approve" | "reject") {
     const token = sessionStorage.getItem("authToken");
     const response = await fetch(`http://localhost:3000/api/seller/orders/refunds/${id}/${decision}`, { method: "POST", headers: { Authorization: `Bearer ${token}` } });
@@ -132,28 +192,35 @@ function SellerHome() {
       return;
     }
 
-    // Send the listing as form data so the cover image file can be included
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("author", author);
-    formData.append("isbn", isbn);
-    formData.append("genre", genre);
-    formData.append("condition", condition);
-    formData.append("description", description);
-    formData.append("price", price);
-    formData.append("stock", stock);
-    if (image) {
-      formData.append("image", image);
-    }
-
     try {
-      const response = await fetch("http://localhost:3000/api/seller/listings", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
-        },
-        body: formData,
-      });
+      let response: Response;
+      if (editingListingId) {
+        response = await fetch(`http://localhost:3000/api/seller/listings/${editingListingId}`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${sessionStorage.getItem("authToken")}`,
+          },
+          body: JSON.stringify({ title, author, isbn, genre, condition, description, price, stock }),
+        });
+      } else {
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("author", author);
+        formData.append("isbn", isbn);
+        formData.append("genre", genre);
+        formData.append("condition", condition);
+        formData.append("description", description);
+        formData.append("price", price);
+        formData.append("stock", stock);
+        if (image) formData.append("image", image);
+
+        response = await fetch("http://localhost:3000/api/seller/listings", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("authToken")}` },
+          body: formData,
+        });
+      }
 
       const data = await response.json();
 
@@ -162,7 +229,7 @@ function SellerHome() {
         return;
       }
 
-      setMessage(data.message);
+      setMessage(data.message || (editingListingId ? "Listing updated and submitted for review." : "Listing submitted."));
 
       // Clear the form for the next listing
       setTitle("");
@@ -175,11 +242,59 @@ function SellerHome() {
       setStock("");
       setImage(null);
       setFileInputKey((key) => key + 1);
+      setEditingListingId(null);
 
       setListings(await fetchMyListings());
     } catch {
       setMessage("Could not connect to the server.");
     }
+  }
+
+  function startEditing(listing: Listing) {
+    setEditingListingId(listing.id);
+    setTitle(listing.title);
+    setAuthor(listing.author);
+    setIsbn(listing.isbn);
+    setGenre(listing.genre);
+    setCondition(listing.condition);
+    setDescription(listing.description);
+    setPrice(listing.price);
+    setStock(String(listing.stock));
+    setImage(null);
+    setFileInputKey((key) => key + 1);
+    setMessage("Editing listing. Description and cover image can be reviewed below.");
+    document.getElementById("seller-listing-form")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function deleteListing(listing: Listing) {
+    if (!window.confirm(`Remove "${listing.title}"? Listings with existing orders cannot be removed.`)) return;
+    const token = sessionStorage.getItem("authToken");
+    try {
+      const response = await fetch(`http://localhost:3000/api/seller/listings/${listing.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json().catch(() => ({}));
+      setListMessage(data.error || (response.ok ? "Listing removed." : "Could not remove listing."));
+      if (response.ok) setListings(await fetchMyListings());
+    } catch {
+      setListMessage("Could not connect to the server.");
+    }
+  }
+
+  function cancelEditing() {
+    setEditingListingId(null);
+    setTitle("");
+    setAuthor("");
+    setIsbn("");
+    setGenre("");
+    setCondition("new");
+    setDescription("");
+    setPrice("");
+    setStock("");
+    setImage(null);
+    setFileInputKey((key) => key + 1);
+    setMessage("");
   }
 
   const pendingSales = sales.filter((sale) => sale.fulfillmentStatus === "pending").length;
@@ -197,6 +312,44 @@ function SellerHome() {
         <div><span>Active listings</span><strong>{listings.filter((listing) => listing.status === "approved").length}</strong><small>published books</small></div>
         <div><span>Fulfillment queue</span><strong>{pendingSales}</strong><small>orders to process</small></div>
         <div><span>Customer care</span><strong>{openRefunds}</strong><small>refunds awaiting review</small></div>
+      </section>
+      <section className="panel seller-control-panel warehouse-panel">
+        <div className="seller-section-heading">
+          <div><p className="eyebrow">Private integration</p><h2>Warehouse webhook</h2></div>
+          <span className="pill">{warehouseConfigured ? (warehouseEnabled ? "Connected" : "Disabled") : "Not configured"}</span>
+        </div>
+        <p className="muted">Send signed fulfillment events directly to this seller's warehousing service. Only this seller can view or change this configuration.</p>
+        <form className="warehouse-form" onSubmit={saveWarehouse}>
+          <label>
+            Warehouse endpoint URL
+            <input
+              type="url"
+              value={warehouseUrl}
+              onChange={(event) => setWarehouseUrl(event.target.value)}
+              placeholder="https://warehouse.example.com/bookhaven"
+              required
+            />
+          </label>
+          <label>
+            HMAC signing secret
+            <input
+              type="password"
+              value={warehouseSecret}
+              onChange={(event) => setWarehouseSecret(event.target.value)}
+              placeholder={warehouseConfigured ? "Configured secret" : "Leave blank to generate securely"}
+              minLength={16}
+            />
+          </label>
+          <label className="warehouse-toggle">
+            <input type="checkbox" checked={warehouseEnabled} onChange={(event) => setWarehouseEnabled(event.target.checked)} />
+            <span>Enable warehouse events</span>
+          </label>
+          <div className="seller-action-row">
+            <button type="submit">Save webhook</button>
+            <button type="button" className="secondary" disabled={!warehouseConfigured} onClick={testWarehouse}>Send test event</button>
+          </div>
+        </form>
+        {warehouseMessage && <p className="status-message" role="status">{warehouseMessage}</p>}
       </section>
       {earnings && (
         <section className="panel seller-control-panel">
@@ -224,7 +377,7 @@ function SellerHome() {
       <section className="panel seller-control-panel">
       <div className="seller-section-heading"><div><p className="eyebrow">Catalog</p><h2>Add a book</h2></div></div>
 
-      <form onSubmit={handleUpload}>
+      <form id="seller-listing-form" onSubmit={handleUpload}>
         <input
           type="text"
           placeholder="Title"
@@ -298,7 +451,8 @@ function SellerHome() {
           />
         </label>
 
-        <button type="submit">Upload</button>
+        <button type="submit">{editingListingId ? "Save changes" : "Upload"}</button>
+        {editingListingId && <button type="button" className="secondary" onClick={cancelEditing}>Cancel edit</button>}
       </form>
 
       {message && <p className="status-message">{message}</p>}
@@ -314,6 +468,10 @@ function SellerHome() {
             {listing.status === "rejected" && listing.rejectionReason && (
               <small>Reason: {listing.rejectionReason}</small>
             )}
+            <div className="seller-action-row">
+              <button type="button" onClick={() => startEditing(listing)}>Edit</button>
+              <button type="button" className="danger" onClick={() => deleteListing(listing)}>Remove</button>
+            </div>
           </li>
         ))}
       </ul>
